@@ -16,7 +16,7 @@
 #  - dotnet (will update to 2.0.0 separately)
 #  - haxe (not in centos)
 
-FROM centos:7.3.1611
+FROM centos:centos7
 MAINTAINER Apache Thrift <dev@thrift.apache.org>
 
 RUN yum install -y epel-release
