@@ -11,7 +11,6 @@
 #include <yarp/os/ConnectionWriter.h>
 #include <yarp/os/BufferedPort.h>
 #include <yarp/os/Property.h>
-#include <yarp/os/IConfig.h>
 
 #include <yarp/dev/api.h>
 
@@ -26,13 +25,16 @@ class DeviceResponder;
  *
  * Interface implemented by all device drivers.
  */
-class YARP_dev_API yarp::dev::DeviceDriver : public yarp::os::IConfig
+class YARP_dev_API yarp::dev::DeviceDriver
 {
 public:
-    /**
-     * Destructor.
-     */
-    ~DeviceDriver() override = default;
+    DeviceDriver();
+    DeviceDriver(const DeviceDriver& other) = delete;
+    DeviceDriver(DeviceDriver&& other) noexcept = delete;
+    DeviceDriver& operator=(const DeviceDriver& other) = delete;
+    DeviceDriver& operator=(DeviceDriver&& other) noexcept = delete;
+
+    virtual ~DeviceDriver();
 
     /**
      * Open the DeviceDriver.
@@ -47,14 +49,30 @@ public:
      * yarp developers to add documentation for your device).
      * @return true/false upon success/failure
      */
-    bool open(yarp::os::Searchable& config) override { YARP_UNUSED(config); return true; }
+    virtual bool open(yarp::os::Searchable& config) { YARP_UNUSED(config); return true; }
 
     /**
      * Close the DeviceDriver.
      * @return true/false on success/failure.
      */
-    bool close() override { return true; }
+    virtual bool close() { return true; }
 
+
+    /**
+     * Return the id assigned to the PolyDriver.
+     * If no name was assigned, returns the name of the device (if set) or an
+     * empty string.
+     * The value can be set by passing the `id` option when opening the device
+     * or with the `setId()` method.
+     *
+     * @return the id for this device.
+     */
+    virtual std::string id() const;
+
+    /**
+     * Set the id for this device
+     */
+    virtual void setId(const std::string& id);
 
     /**
      * Get an interface to the device driver.
@@ -93,6 +111,12 @@ public:
     virtual DeviceDriver *getImplementation() {
         return this;
     }
+
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
+private:
+    class Private;
+    Private* mPriv = nullptr;
+#endif
 };
 
 /**

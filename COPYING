@@ -33,7 +33,7 @@ GPL-2.0 or later, GPL-3.0 or later, or Apache-2.0 License:
      - `Rangefinder2DWrapper`
      - `rpLidar`
      - `rpLidar2`
-     - `roLidar3`
+     - `rpLidar3`
      - `SDLJoypad`
      - `transformClient`
      - `transformServer`
@@ -61,7 +61,7 @@ GPL-2.0 or later, GPL-3.0 or later, or Apache-2.0 License:
      [libdc1394](http://damien.douxchamps.net/ieee1394/libdc1394/) or, if the
      library is not available, links statically a few files taken from
      [libdc1394](http://libdc1394.git.sourceforge.net/git/gitweb.cgi?p=libdc1394/libdc1394;a=blob_plain;f=libdc1394/dc1394/bayer.c;hb=HEAD).
-   + The `h264` carrier uses glib (LGPLv2.1 or later) and gstreamer (LGPLv2.1 or
+   + The `gstreamer` carrier uses glib (LGPLv2.1 or later) and gstreamer (LGPLv2.1 or
      later).
    + The `mpi` carrier uses MPI (license dependent on the implementation).
    + The `dynamixelAX12Ftdi` device uses
@@ -97,30 +97,33 @@ The list of committers in the YARP repository (ordered by number of commit) is:
   Ugo Pattacini
   Ali Paikan
   YARP Developers
+  Silvio Traversaro
   Damiano Enerli
   Andrea Ruzzenenti
   Alessandro Scalzo
-  Silvio Traversaro
   Elena Ceseracciu
+  Ettore Landini
   Francesco Romano
   Stefano Bernagozzi
   Matteo Brunettini
   Giacomo Spigler
   Giorgio Metta
   Vadim Tikhanoff
-  Ettore Landini
+  Bartek Łukawski
   Davide Perrone
   Alessandro Roncone
-  Bartek Łukawski
   Valentina Gaggero
   Giulia Martino
   Claudio Fantacci
   Konstantinos Theofilis
+  Stefano Dafarra
   Alexandre Bernardino
   Tobias Fischer
   Duarte Aragao
   Francesco Nori
   Diego Ferigo
+  fbrand-new
+  robotology-bot (Tag Repository Action)
   Juan G. Victores
   Nuno Guedelha
   Andrea Del Prete
@@ -128,7 +131,10 @@ The list of committers in the YARP repository (ordered by number of commit) is:
   Carlos Beltran-Gonzalez
   Claudio Castellini
   Daniel Krieg
+  Nick Tremaroli
+  Simone Girardi
   Fabio Valla
+  Arren Glover
   Prashanth Ramadoss
   Alexandros Paraschos
   Plinio Moreno
@@ -139,9 +145,10 @@ The list of committers in the YARP repository (ordered by number of commit) is:
   Jonas Ruesch
   Lorenzo Rapetti
   Michael Bucko
-  Stefano Dafarra
   Giulio Romualdi
   Massimo Regoli
+  Nicola Piga
+  tumme
   Aiko Dinale
   Alessio Rocchi
   Mirko Ferrati
@@ -150,8 +157,9 @@ The list of committers in the YARP repository (ordered by number of commit) is:
   Bertrand Higy
   David-Estevez
   Francesco Giovannini
-  Arren Glover
+  hypothe
   Bruno Nery
+  Davide
   Davide Pollarolo
   Emilio Cartoni
   Fabien Benureau
@@ -162,44 +170,57 @@ The list of committers in the YARP repository (ordered by number of commit) is:
   Johnny Willemsen
   Mohamed Babiker Mohamed Elobaid
   Naeem Assif Mirza
-  Nicola Piga
+  Simone
   Ze Ji
+  Alessandro Croci
+  Alessandro Croci
   Austin Kothig
+  Bartek Łukawski
   Carlo Ciliberto
   Carlotta Sartore
   Claudia Latella
+  Davide Gorbani
   Davide Tome
   Elena Rampone
   Emilio Benenati
   Enrico Mingo
   Francesca Stramandinoli
+  Francesco Brand
+  Giovanni Fregonese
   Giovanni Saponaro
   Giuseppe L'Erario
+  Ines Sorrentino
   Jason Chevrie
+  Marco Gabriele Fedozzi
   Marco Monforte
+  Marco Randazzo
+  Marco Randazzo
   Massimiliano Iacono
   Matej Hoffmann
+  Mattia Fussi
   Pedro Vicente
   Serena Ivaldi
   Vítor Galvão
   Zero King
+  elisabeth-ms
 
 The list of copyright holders for YARP is:
-  Copyright (C) 1995, 2000, 2003, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021
-    Istituto Italiano di Tecnologia (IIT) (2591 files)
-    RobotCub Consortium (785 files)
+  Copyright (C) 1995, 2000, 2003, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024, 2025
+    Istituto Italiano di Tecnologia (IIT) (2712 files)
+    RobotCub Consortium (728 files)
     Daniel Krieg <krieg@fias.uni-frankfurt.de> (16 files)
     Anne van Rossum <anne@almende.com> (11 files)
     Arjan Gijsberts (10 files)
-    Giacomo Spigler (7 files)
-    Alexandre Bernardino (5 files)
-    Carlos Beltran-Gonzalez (5 files)
     Digia Plc and/or its subsidiary(-ies) (4 files)
+    Alexandre Bernardino (3 files)
+    Carlos Beltran-Gonzalez (3 files)
+    Giacomo Spigler (3 files)
     Eric Mislivec (2 files)
     Freyr Magnusson (2 files)
     Intel Corporation (2 files)
-    Julio Gomes (2 files)
     Ze Ji (2 files)
+    Copyright: NO_DOC (1 file)
+    Copyright: THRIFT_NO_DOC (1 file)
     Fabrice Bellard (1 file)
     Francesco Giovannini (1 file)
     Jonas Ruesch (1 file)

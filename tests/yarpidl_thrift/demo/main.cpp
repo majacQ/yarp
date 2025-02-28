@@ -12,6 +12,7 @@
 #include <Wrapping.h>
 #include <TestAnnotatedTypes.h>
 #include <TestSomeMoreTypes.h>
+#include <TestSomeLists.h>
 #if defined(THRIFT_INCLUDE_PREFIX) && defined(THRIFT_NO_NAMESPACE_PREFIX)
 # include <sub/directory/ClockServer.h>
 #elif defined(THRIFT_INCLUDE_PREFIX)
@@ -23,13 +24,7 @@
 #endif
 #include <Settings.h>
 
-#define CATCH_CONFIG_MAIN
-#if defined(USE_SYSTEM_CATCH)
-#include <catch.hpp>
-#else
-#include "catch.hpp"
-#endif
-
+#include <catch2/catch_amalgamated.hpp>
 
 using namespace yarp::os;
 using namespace yarp::os::impl;
@@ -742,7 +737,6 @@ TEST_CASE("IdlThriftTest", "[yarp::idl::thrift]")
 
     SECTION("test general help")
     {
-
         Server server;
         Bottle bot("[help]");
         DummyConnector con;
@@ -796,7 +790,7 @@ TEST_CASE("IdlThriftTest", "[yarp::idl::thrift]")
         bot.read(con.getReader());
         INFO("Structure specific help is " << bot.toString());
         std::string help = bot.toString();
-        CHECK(help.find("this is the x part") != std::string::npos);
+        CHECK(help.find("this is the \\\"x\\\" part") != std::string::npos);
     }
 
     SECTION("test primitives")
@@ -809,12 +803,174 @@ TEST_CASE("IdlThriftTest", "[yarp::idl::thrift]")
         a.a_i16 = 16;
         a.a_i32 = 32;
         a.a_i64 = 64;
+        a.a_double = 0.64;
+        a.a_string = "A string";
         tmp.read(a);
         tmp.write(b);
         CHECK(a.a_bool == b.a_bool);
         CHECK(a.a_i16 == b.a_i16);
         CHECK(a.a_i32 == b.a_i32);
         CHECK(a.a_i64 == b.a_i64);
+        CHECK(a.a_double == b.a_double);
+        CHECK(a.a_string == b.a_string);
+
+    }
+
+    SECTION("test lists")
+    {
+        TestSomeLists a;
+        TestSomeLists b;
+        Bottle tmp;
+
+        a.a_list_of_bool = std::vector<bool>({true, false});
+        a.a_list_of_i8 = std::vector<std::int8_t>({-8, 8});
+        a.a_list_of_i16 = std::vector<std::int16_t>({-16, 16});
+        a.a_list_of_i32 = std::vector<std::int32_t>({-32, 32});
+        a.a_list_of_i64 = std::vector<std::int64_t>({-64, 64});
+        a.a_list_of_double = std::vector<double>({-0.64, 0.64});
+        a.a_list_of_string = std::vector<std::string>({"A string", "Another string"});
+        a.a_list_of_binary.resize(2);
+        a.a_list_of_binary[0].resize(6);
+        memset(a.a_list_of_binary[0].data(), 0, a.a_list_of_binary[0].size());
+        a.a_list_of_binary[0][a.a_list_of_binary[0].size() - 1] = 'C';
+        a.a_list_of_binary[1].resize(12);
+        memset(a.a_list_of_binary[1].data(), 0, a.a_list_of_binary[1].size());
+        a.a_list_of_binary[1][a.a_list_of_binary[1].size() - 1] = 'D';
+
+        tmp.read(a);
+        tmp.write(b);
+
+        CHECK(b.a_list_of_bool.size() == a.a_list_of_bool.size());
+        CHECK(b.a_list_of_bool[0]   == a.a_list_of_bool[0]);
+        CHECK(b.a_list_of_bool[1]   == a.a_list_of_bool[1]);
+        CHECK(b.a_list_of_i8.size() == a.a_list_of_i8.size());
+        CHECK(b.a_list_of_i8[0]     == a.a_list_of_i8[0]);
+        CHECK(b.a_list_of_i8[1]     == a.a_list_of_i8[1]);
+        CHECK(b.a_list_of_i16.size() == a.a_list_of_i16.size());
+        CHECK(b.a_list_of_i16[0]    == a.a_list_of_i16[0]);
+        CHECK(b.a_list_of_i16[1]    == a.a_list_of_i16[1]);
+        CHECK(b.a_list_of_i32.size() == a.a_list_of_i32.size());
+        CHECK(b.a_list_of_i32[0]    == a.a_list_of_i32[0]);
+        CHECK(b.a_list_of_i32[1]    == a.a_list_of_i32[1]);
+        CHECK(b.a_list_of_i64.size() == a.a_list_of_i64.size());
+        CHECK(b.a_list_of_i64[0]    == a.a_list_of_i64[0]);
+        CHECK(b.a_list_of_i64[1]    == a.a_list_of_i64[1]);
+        CHECK(b.a_list_of_double.size() == a.a_list_of_double.size());
+        CHECK(b.a_list_of_double[0] == a.a_list_of_double[0]);
+        CHECK(b.a_list_of_double[1] == a.a_list_of_double[1]);
+        CHECK(b.a_list_of_string.size() == a.a_list_of_string.size());
+        CHECK(b.a_list_of_string[0] == a.a_list_of_string[0]);
+        CHECK(b.a_list_of_string[1] == a.a_list_of_string[1]);
+        CHECK(b.a_list_of_binary.size() == a.a_list_of_binary.size());
+        CHECK(b.a_list_of_binary[0].size() == 6);
+        CHECK(b.a_list_of_binary[1].size() == 12);
+        CHECK(b.a_list_of_binary[0][5] == 'C');
+        CHECK(b.a_list_of_binary[1][11] == 'D');
+    }
+
+    SECTION("test lists with previous data")
+    {
+        TestSomeLists a;
+        TestSomeLists b;
+        Bottle tmp;
+
+        a.a_list_of_bool = std::vector<bool>({true, false});
+        a.a_list_of_i8 = std::vector<std::int8_t>({-8, 8});
+        a.a_list_of_i16 = std::vector<std::int16_t>({-16, 16});
+        a.a_list_of_i32 = std::vector<std::int32_t>({-32, 32});
+        a.a_list_of_i64 = std::vector<std::int64_t>({-64, 64});
+        a.a_list_of_double = std::vector<double>({-0.64, 0.64});
+        a.a_list_of_string = std::vector<std::string>({"A string", "Another string"});
+        a.a_list_of_binary.resize(2);
+        a.a_list_of_binary[0].resize(6);
+        memset(a.a_list_of_binary[0].data(), 0, a.a_list_of_binary[0].size());
+        a.a_list_of_binary[0][a.a_list_of_binary[0].size() - 1] = 'C';
+        a.a_list_of_binary[1].resize(12);
+        memset(a.a_list_of_binary[1].data(), 0, a.a_list_of_binary[1].size());
+        a.a_list_of_binary[1][a.a_list_of_binary[1].size() - 1] = 'D';
+
+        b.a_list_of_bool = std::vector<bool>({false, true, false});
+        b.a_list_of_i8 = std::vector<std::int8_t>({8, -8, 8});
+        b.a_list_of_i16 = std::vector<std::int16_t>({16, -16, 16});
+        b.a_list_of_i32 = std::vector<std::int32_t>({32, -32, 32});
+        b.a_list_of_i64 = std::vector<std::int64_t>({64, -64, 64});
+        b.a_list_of_double = std::vector<double>({0.64, -0.64, 0.64});
+        b.a_list_of_string = std::vector<std::string>({"The string", "A string", "Another string"});
+        b.a_list_of_binary.resize(3);
+        b.a_list_of_binary[0].resize(12);
+        memset(b.a_list_of_binary[0].data(), 0, b.a_list_of_binary[0].size());
+        b.a_list_of_binary[0][b.a_list_of_binary[0].size() - 1] = 'E';
+        b.a_list_of_binary[1].resize(6);
+        memset(b.a_list_of_binary[1].data(), 0, b.a_list_of_binary[1].size());
+        b.a_list_of_binary[1][b.a_list_of_binary[1].size() - 1] = 'F';
+        b.a_list_of_binary[2].resize(12);
+        memset(b.a_list_of_binary[2].data(), 0, b.a_list_of_binary[2].size());
+        b.a_list_of_binary[2][b.a_list_of_binary[2].size() - 1] = 'G';
+
+        tmp.read(a);
+        tmp.write(b);
+
+        CHECK(b.a_list_of_bool.size() == a.a_list_of_bool.size());
+        CHECK(b.a_list_of_bool[0]   == a.a_list_of_bool[0]);
+        CHECK(b.a_list_of_bool[1]   == a.a_list_of_bool[1]);
+        CHECK(b.a_list_of_i8.size() == a.a_list_of_i8.size());
+        CHECK(b.a_list_of_i8[0]     == a.a_list_of_i8[0]);
+        CHECK(b.a_list_of_i8[1]     == a.a_list_of_i8[1]);
+        CHECK(b.a_list_of_i16.size() == a.a_list_of_i16.size());
+        CHECK(b.a_list_of_i16[0]    == a.a_list_of_i16[0]);
+        CHECK(b.a_list_of_i16[1]    == a.a_list_of_i16[1]);
+        CHECK(b.a_list_of_i32.size() == a.a_list_of_i32.size());
+        CHECK(b.a_list_of_i32[0]    == a.a_list_of_i32[0]);
+        CHECK(b.a_list_of_i32[1]    == a.a_list_of_i32[1]);
+        CHECK(b.a_list_of_i64.size() == a.a_list_of_i64.size());
+        CHECK(b.a_list_of_i64[0]    == a.a_list_of_i64[0]);
+        CHECK(b.a_list_of_i64[1]    == a.a_list_of_i64[1]);
+        CHECK(b.a_list_of_double.size() == a.a_list_of_double.size());
+        CHECK(b.a_list_of_double[0] == a.a_list_of_double[0]);
+        CHECK(b.a_list_of_double[1] == a.a_list_of_double[1]);
+        CHECK(b.a_list_of_string.size() == a.a_list_of_string.size());
+        CHECK(b.a_list_of_string[0] == a.a_list_of_string[0]);
+        CHECK(b.a_list_of_string[1] == a.a_list_of_string[1]);
+        CHECK(b.a_list_of_binary.size() == a.a_list_of_binary.size());
+        CHECK(b.a_list_of_binary[0].size() == 6);
+        CHECK(b.a_list_of_binary[1].size() == 12);
+        CHECK(b.a_list_of_binary[0][5] == 'C');
+        CHECK(b.a_list_of_binary[1][11] == 'D');
+    }
+
+    SECTION("test empty lists")
+    {
+        TestSomeLists a;
+        TestSomeLists b;
+        Bottle tmp;
+
+        // Fill b with random stuff
+        b.a_list_of_bool = std::vector<bool>({true, false});
+        b.a_list_of_i8 = std::vector<std::int8_t>({-8, 8});
+        b.a_list_of_i16 = std::vector<std::int16_t>({-16, 16});
+        b.a_list_of_i32 = std::vector<std::int32_t>({-32, 32});
+        b.a_list_of_i64 = std::vector<std::int64_t>({-64, 64});
+        b.a_list_of_double = std::vector<double>({-0.64, 0.64});
+        b.a_list_of_string = std::vector<std::string>({"A string", "Another string"});
+        b.a_list_of_binary.resize(2);
+        b.a_list_of_binary[0].resize(6);
+        memset(b.a_list_of_binary[0].data(), 0, b.a_list_of_binary[0].size());
+        b.a_list_of_binary[0][b.a_list_of_binary[0].size() - 1] = 'C';
+        b.a_list_of_binary[1].resize(12);
+        memset(b.a_list_of_binary[1].data(), 0, b.a_list_of_binary[1].size());
+        b.a_list_of_binary[1][b.a_list_of_binary[1].size() - 1] = 'D';
+
+        tmp.read(a);
+        tmp.write(b);
+
+        CHECK(b.a_list_of_bool.empty());
+        CHECK(b.a_list_of_i8.empty());
+        CHECK(b.a_list_of_i16.empty());
+        CHECK(b.a_list_of_i32.empty());
+        CHECK(b.a_list_of_i64.empty());
+        CHECK(b.a_list_of_double.empty());
+        CHECK(b.a_list_of_string.empty());
+        CHECK(b.a_list_of_binary.empty());
     }
 
     SECTION("test annotated types")
@@ -956,4 +1112,9 @@ TEST_CASE("IdlThriftTest", "[yarp::idl::thrift]")
         INFO("calling a const method");
         CHECK(const_cast<const Demo&>(client).this_is_a_const_method());
     }
+}
+
+int main(int argc, char* argv[])
+{
+    return Catch::Session().run(argc, argv);
 }

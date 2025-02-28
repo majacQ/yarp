@@ -35,15 +35,6 @@
 #include <yarp/os/SystemClock.h>
 #include <yarp/dataplayer/YarpDataplayer.h>
 
-//ROS messages
-#include <yarp/rosmsg/sensor_msgs/LaserScan.h>
-#include <yarp/rosmsg/nav_msgs/Odometry.h>
-#include <yarp/rosmsg/tf/tfMessage.h>
-#include <yarp/rosmsg/tf2_msgs/TFMessage.h>
-#include <yarp/rosmsg/geometry_msgs/Pose.h>
-#include <yarp/rosmsg/geometry_msgs/Pose2D.h>
-
-
 using namespace yarp::yarpDataplayer;
 using namespace yarp::os;
 using namespace yarp::sig;
@@ -451,21 +442,6 @@ bool DataplayerUtilities::configurePorts(PartsData &part)
     {
         if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::sig::Image>; }
     }
-    else if (strcmp(part.type.c_str(), "sensor_msgs/LaserScan") == 0 ) {
-        if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::rosmsg::sensor_msgs::LaserScan>; }
-    }
-    else if (strcmp(part.type.c_str(), "nav_msgs/Odometry") == 0) {
-        if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::rosmsg::nav_msgs::Odometry>; }
-    }
-    else if (strcmp(part.type.c_str(), "tf2_msgs/tf") == 0) {
-        if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::rosmsg::tf2_msgs::TFMessage>; }
-    }
-    else if (strcmp(part.type.c_str(), "geometry_msgs/Pose") == 0) {
-        if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::rosmsg::geometry_msgs::Pose>; }
-    }
-    else if (strcmp(part.type.c_str(), "geometry_msgs/Pose2D") == 0) {
-        if (part.outputPort == nullptr) { part.outputPort = new BufferedPort<yarp::rosmsg::geometry_msgs::Pose2D>; }
-    }
     else
     {
         if (verbose){
@@ -650,25 +626,9 @@ void DataplayerWorker::run()
             ret = sendImages(part, frame);
         }
         else if (strcmp(utilities->partDetails[part].type.c_str(), "Bottle") == 0)  {
-            ret = sendBottle(part, frame);
-            // the above line can be safely replaced with sendGenericData<Bottle>.
-            // I kept it for no particular reason, thinking that maybe it could be convenient (later)
-            // to process Bottles in a different way.
-        }
-        else if (strcmp(utilities->partDetails[part].type.c_str(), "sensor_msgs/LaserScan") == 0)  {
-            ret = sendGenericData<yarp::rosmsg::sensor_msgs::LaserScan>(part, frame);
-        }
-        else if (strcmp(utilities->partDetails[part].type.c_str(), "nav_msgs/Odometry") == 0) {
-            ret = sendGenericData<yarp::rosmsg::nav_msgs::Odometry>(part, frame);
-        }
-        else if (strcmp(utilities->partDetails[part].type.c_str(), "tf2_msgs/tf") == 0) {
-            ret = sendGenericData<yarp::rosmsg::tf2_msgs::TFMessage>(part, frame);
-        }
-        else if (strcmp(utilities->partDetails[part].type.c_str(), "geometry_msgs/Pose") == 0) {
-            ret = sendGenericData<yarp::rosmsg::geometry_msgs::Pose>(part, frame);
-        }
-        else if (strcmp(utilities->partDetails[part].type.c_str(), "geometry_msgs/Pose2D") == 0) {
-            ret = sendGenericData<yarp::rosmsg::geometry_msgs::Pose2D>(part, frame);
+            ret = sendGenericData<Bottle>(part, frame);
+            //the above line could be replaced with sendBottle(part, frame) if
+            //specifically different behaviour is required for a bottle.
         }
         else  {
             if (utilities->verbose){
@@ -720,6 +680,10 @@ int DataplayerWorker::sendBottle(int part, int frame)
 
     Bottle& outBot = the_port->prepare();
     outBot = tmp;
+
+    /* Note: sendBottle differs from sendGenericData as the envelope is a single
+             timestamp, ionstead of the standard yarp::os::Stamp which includes
+             also the sequence number */
 
     //propagate timestamp
     std::string time = yarp::conf::numeric::to_string(utilities->partDetails[part].timestamp[frame]);
@@ -850,11 +814,6 @@ void DataplayerWorker::setManager(yarp::yarpDataplayer::DataplayerUtilities *uti
 
 /**********************************************************/
 template int DataplayerWorker::sendGenericData<yarp::os::Bottle>(int,int);
-template int DataplayerWorker::sendGenericData<yarp::rosmsg::sensor_msgs::LaserScan>(int, int);
-template int DataplayerWorker::sendGenericData<yarp::rosmsg::nav_msgs::Odometry>(int, int);
-template int DataplayerWorker::sendGenericData<yarp::rosmsg::tf2_msgs::TFMessage>(int, int);
-template int DataplayerWorker::sendGenericData<yarp::rosmsg::geometry_msgs::Pose>(int, int);
-template int DataplayerWorker::sendGenericData<yarp::rosmsg::geometry_msgs::Pose2D>(int, int);
 
 /**********************************************************/
 template <class T>
@@ -1053,43 +1012,48 @@ void DataplayerEngine::stepFromCmd()
 /**********************************************************/
 void DataplayerEngine::runNormally()
 {
-    for (int i=0; i < this->numPart; i++){
-        bool isActive = this->isPartActive[i];
-        if ( this->utilities->partDetails[i].currFrame <= this->utilities->partDetails[i].maxFrame ){
-            if ( this->virtualTime >= this->utilities->partDetails[i].timestamp[ this->utilities->partDetails[i].currFrame ] ){
-                if ( this->initTime > 300 && this->virtualTime < this->utilities->partDetails[i].timestamp[this->utilities->partDetails[i].timestamp.length()-1]){
-                    this->initTime = 0;
-                }
-                if (!this->utilities->partDetails[i].hasNotified){
-                    this->utilities->partDetails[i].worker->sendData(this->utilities->partDetails[i].currFrame, isActive, this->virtualTime );
-                    this->utilities->partDetails[i].currFrame++;
-                }
-            }
-        } else {
-            if (this->utilities->repeat) {
-                this->initThread();
-                this->utilities->partDetails[i].worker->init();
-            } else {
-                if ( !this->utilities->partDetails[i].hasNotified ) {
-                    if (utilities->verbose){
-                        yInfo() << "partID:" << i << "has finished";
-                    }
-                    this->utilities->partDetails[i].hasNotified = true;
-                }
+    for (int i=0; i < this->numPart; i++) {
+        //get a reference to the part we are interested in
+        PartsData &this_part = this->utilities->partDetails[i];
 
+        //if we have alredy stopped we have nothing to do
+        if(this_part.hasNotified)
+            continue;
+
+        //if this port is not active, keep progressing though the frames without
+        //sending, so if the part activates it is in synch
+        bool isActive = this->isPartActive[i];
+
+        //send all available frames up to the current virtualTime
+        while (this_part.currFrame <= this_part.maxFrame &&
+            this->virtualTime >= this_part.timestamp[this_part.currFrame]) {
+            this_part.worker->sendData(this_part.currFrame++, isActive, this->virtualTime);
+        }
+
+        //if we have sent all frames perform reset/stop
+        if(this_part.currFrame > this_part.maxFrame) {
+            if (this->utilities->repeat) {
+                //restart the part
+                this->initThread();
+                this_part.worker->init();
+            } else {
+                //this part has finished
+                if (utilities->verbose) {
+                    yInfo() << "partID:" << i << "has finished";
+                }
+                this_part.hasNotified = true;
+
+                //perform a check to see if ALL parts have finished
                 int stopAll = 0;
                 for (int x=0; x < this->numPart; x++){
-                    if (this->utilities->partDetails[x].hasNotified){
-                        stopAll++;
+                    stopAll += this->utilities->partDetails[x].hasNotified ? 1 : 0;
+                }
+                if (stopAll == this->numPart) {
+                    if (utilities->verbose) {
+                        yInfo() << "All parts have Finished!";
                     }
-
-                    if (stopAll == this->numPart){
-                        if (utilities->verbose) {
-                            yInfo() << "All parts have Finished!";
-                        }
-                        this->utilities->stopAtEnd();
-                        this->allPartsStatus = true;
-                    }
+                    this->utilities->stopAtEnd();
+                    this->allPartsStatus = true;
                 }
             }
         }
@@ -1097,7 +1061,6 @@ void DataplayerEngine::runNormally()
 
     this->virtualTime += this->diff_seconds() * this->utilities->speed;
     this->tick();
-    this->initTime++;
 }
 
 /**********************************************************/

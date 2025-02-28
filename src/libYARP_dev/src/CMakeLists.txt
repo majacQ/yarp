@@ -8,7 +8,6 @@ add_library(YARP::YARP_dev ALIAS YARP_dev)
 set(YARP_dev_HDRS
   yarp/dev/all.h
   yarp/dev/api.h
-  yarp/dev/AudioBufferSize.h
   yarp/dev/AudioGrabberInterfaces.h
   yarp/dev/AudioGrabberVocabs.h
   yarp/dev/AudioPlayerDeviceBase.h
@@ -26,7 +25,6 @@ set(YARP_dev_HDRS
   yarp/dev/ControlBoardPid.h
   yarp/dev/ControlBoardVocabs.h
   yarp/dev/DeviceDriver.h
-  yarp/dev/DriverLinkCreator.h
   yarp/dev/Drivers.h
   yarp/dev/GPUInterface.h
   yarp/dev/GazeControl.h
@@ -40,12 +38,14 @@ set(YARP_dev_HDRS
   yarp/dev/IAxisInfo.h
   yarp/dev/IBattery.h
   yarp/dev/ICalibrator.h
+  yarp/dev/IChatBot.h
   yarp/dev/IControlCalibration.h
   yarp/dev/IControlDebug.h
   yarp/dev/IControlLimits.h
   yarp/dev/IControlMode.h
   yarp/dev/ICurrentControl.h
   yarp/dev/IDepthVisualParams.h
+  yarp/dev/IDeviceDriverParams.h
   yarp/dev/IEncoders.h
   yarp/dev/IEncodersTimed.h
   yarp/dev/IFrameGrabberControls.h
@@ -58,7 +58,10 @@ set(YARP_dev_HDRS
   yarp/dev/IHapticDevice.h
   yarp/dev/IImpedanceControl.h
   yarp/dev/IInteractionMode.h
+  yarp/dev/IJointCoupling.h
   yarp/dev/IJoypadController.h
+  yarp/dev/IJointFault.h
+  yarp/dev/ILLM.h
   yarp/dev/IMotor.h
   yarp/dev/IMotorEncoders.h
   yarp/dev/IMultipleWrapper.h
@@ -74,6 +77,8 @@ set(YARP_dev_HDRS
   yarp/dev/IRgbVisualParams.h
   yarp/dev/IRobotDescription.h
   yarp/dev/ISerialDevice.h
+  yarp/dev/ISpeechSynthesizer.h
+  yarp/dev/ISpeechTranscription.h
   yarp/dev/ITorqueControl.h
   yarp/dev/IVelocityControl.h
   yarp/dev/IVirtualAnalogSensor.h
@@ -90,6 +95,8 @@ set(YARP_dev_HDRS
   yarp/dev/ImplementEncodersTimed.h
   yarp/dev/ImplementImpedanceControl.h
   yarp/dev/ImplementInteractionMode.h
+  yarp/dev/ImplementJointCoupling.h
+  yarp/dev/ImplementJointFault.h
   yarp/dev/ImplementMotor.h
   yarp/dev/ImplementMotorEncoders.h
   yarp/dev/ImplementPWMControl.h
@@ -100,7 +107,6 @@ set(YARP_dev_HDRS
   yarp/dev/ImplementTorqueControl.h
   yarp/dev/ImplementVelocityControl.h
   yarp/dev/ImplementVirtualAnalogSensor.h
-  yarp/dev/LaserMeasurementData.h
   yarp/dev/Lidar2DDeviceBase.h
   yarp/dev/MultipleAnalogSensorsInterfaces.h
   yarp/dev/PidEnums.h
@@ -108,9 +114,11 @@ set(YARP_dev_HDRS
   yarp/dev/PolyDriverDescriptor.h
   yarp/dev/PolyDriverList.h
   yarp/dev/RGBDSensorParamParser.h
+  yarp/dev/ReturnValue.h
   yarp/dev/ServiceInterfaces.h
   yarp/dev/WrapperMultiple.h
   yarp/dev/WrapperSingle.h
+  yarp/dev/testInterfaces/IFakeDeviceInterfaceTest.h
 )
 
 if(TARGET YARP::YARP_math)
@@ -128,29 +136,7 @@ if(TARGET YARP::YARP_math)
     yarp/dev/Map2DPath.h
     yarp/dev/NavTypes.h
     yarp/dev/MapGrid2DInfo.h
-  )
-endif()
-
-if(NOT YARP_NO_DEPRECATED)
-  list(APPEND YARP_dev_HDRS
-    yarp/dev/FrameGrabberControl2.h      # DEPRECATED Since YARP 3.0.0
-    yarp/dev/IControlLimits2.h           # DEPRECATED Since YARP 3.0.0
-    yarp/dev/IControlMode2.h             # DEPRECATED Since YARP 3.0.0
-    yarp/dev/IPositionControl2.h         # DEPRECATED Since YARP 3.0.0
-    yarp/dev/IVelocityControl2.h         # DEPRECATED Since YARP 3.0.0
-    yarp/dev/ImplementControlLimits2.h   # DEPRECATED Since YARP 3.0.0
-    yarp/dev/ImplementControlMode2.h     # DEPRECATED Since YARP 3.0.0
-    yarp/dev/ImplementPositionControl2.h # DEPRECATED Since YARP 3.0.0
-    yarp/dev/ImplementVelocityControl2.h # DEPRECATED Since YARP 3.0.0
-    yarp/dev/DataSource.h                # DEPRECATED Since YARP 3.3.0
-    yarp/dev/GenericSensorInterfaces.h   # DEPRECATED Since YARP 3.3.0
-    yarp/dev/PreciselyTimed.h            # DEPRECATED Since YARP 3.3.0
-    yarp/dev/SerialInterfaces.h          # DEPRECATED Since YARP 3.3.0
-    yarp/dev/Wrapper.h                   # DEPRECATED Since YARP 3.3.0
-    yarp/dev/FrameGrabberInterfaces.h    # DEPRECATED Since YARP 3.5.0
-    yarp/dev/IFrameGrabber.h             # DEPRECATED Since YARP 3.5.0
-    yarp/dev/IFrameGrabberRgb.h          # DEPRECATED Since YARP 3.5.0
-    yarp/dev/IVisualParams.h             # DEPRECATED Since YARP 3.5.0
+    yarp/dev/FrameTransformContainer.h
   )
 endif()
 
@@ -160,7 +146,6 @@ set(YARP_dev_IMPL_HDRS
 )
 
 set(YARP_dev_SRCS
-  yarp/dev/AudioBufferSize.cpp
   yarp/dev/AudioPlayerDeviceBase.cpp
   yarp/dev/AudioRecorderDeviceBase.cpp
   yarp/dev/CanBusInterface.cpp
@@ -169,7 +154,6 @@ set(YARP_dev_SRCS
   yarp/dev/ControlBoardInterfacesImpl.cpp
   yarp/dev/ControlBoardPid.cpp
   yarp/dev/DeviceDriver.cpp
-  yarp/dev/DriverLinkCreator.cpp
   yarp/dev/Drivers.cpp
   yarp/dev/GazeControl.cpp
   yarp/dev/IAnalogSensor.cpp
@@ -178,7 +162,9 @@ set(YARP_dev_SRCS
   yarp/dev/IAudioVisualGrabber.cpp
   yarp/dev/IAudioVisualStream.cpp
   yarp/dev/IBattery.cpp
+  yarp/dev/IChatBot.cpp
   yarp/dev/IDepthVisualParams.cpp
+  yarp/dev/IDeviceDriverParams.cpp
   yarp/dev/IFrameGrabberControls.cpp
   yarp/dev/IFrameGrabberControlsDC1394.cpp
   yarp/dev/IFrameGrabberImage.cpp
@@ -186,6 +172,7 @@ set(YARP_dev_SRCS
   yarp/dev/IFrameWriterImage.cpp
   yarp/dev/IGenericSensor.cpp
   yarp/dev/IJoypadController.cpp
+  yarp/dev/ILLM.cpp
   yarp/dev/IMultipleWrapper.cpp
   yarp/dev/IPreciselyTimed.cpp
   yarp/dev/IRGBDSensor.cpp
@@ -194,6 +181,8 @@ set(YARP_dev_SRCS
   yarp/dev/IRgbVisualParams.cpp
   yarp/dev/IRobotDescription.cpp
   yarp/dev/ISerialDevice.cpp
+  yarp/dev/ISpeechSynthesizer.cpp
+  yarp/dev/ISpeechTranscription.cpp
   yarp/dev/IVisualServoing.cpp
   yarp/dev/IWrapper.cpp
   yarp/dev/ImplementAmplifierControl.cpp
@@ -206,6 +195,8 @@ set(YARP_dev_SRCS
   yarp/dev/ImplementEncodersTimed.cpp
   yarp/dev/ImplementImpedanceControl.cpp
   yarp/dev/ImplementInteractionMode.cpp
+  yarp/dev/ImplementJointCoupling.cpp
+  yarp/dev/ImplementJointFault.cpp
   yarp/dev/ImplementMotor.cpp
   yarp/dev/ImplementMotorEncoders.cpp
   yarp/dev/ImplementPWMControl.cpp
@@ -216,15 +207,16 @@ set(YARP_dev_SRCS
   yarp/dev/ImplementTorqueControl.cpp
   yarp/dev/ImplementVelocityControl.cpp
   yarp/dev/ImplementVirtualAnalogSensor.cpp
-  yarp/dev/LaserMeasurementData.cpp
   yarp/dev/Lidar2DDeviceBase.cpp
   yarp/dev/MultipleAnalogSensorsInterfaces.cpp
   yarp/dev/PolyDriver.cpp
   yarp/dev/PolyDriverDescriptor.cpp
   yarp/dev/PolyDriverList.cpp
+  yarp/dev/ReturnValue.cpp
   yarp/dev/RGBDSensorParamParser.cpp
   yarp/dev/WrapperMultiple.cpp
   yarp/dev/WrapperSingle.cpp
+  yarp/dev/testInterfaces/IFakeDeviceInterfaceTest.cpp
 )
 
 if(TARGET YARP::YARP_math)
@@ -240,29 +232,21 @@ if(TARGET YARP::YARP_math)
     yarp/dev/Map2DArea.cpp
     yarp/dev/Map2DPath.cpp
     yarp/dev/MapGrid2DInfo.cpp
+    yarp/dev/FrameTransformContainer.cpp
   )
 endif()
-
-if(NOT YARP_NO_DEPRECATED)
-  list(APPEND YARP_dev_SRCS
-    yarp/dev/IFrameGrabber.cpp         # DEPRECATED Since YARP 3.5.0
-    yarp/dev/IFrameGrabberRgb.cpp      # DEPRECATED Since YARP 3.5.0
-  )
-endif()
-
 
 # Handle the YARP thrift messages
 include(YarpChooseIDL)
 
 set(YARP_dev_IDL
   idl/stateExt.thrift
-  idl/audioBufferSizeData.thrift
+
   idl/OdometryData.thrift
   idl/OdometryData6D.thrift
-  idl/LaserScan2D.thrift
   idl/MobileBaseVelocity.thrift
-  idl/AudioPlayerStatus.thrift
-  idl/AudioRecorderStatus.thrift
+
+  idl/LLM_Message.thrift
 )
 
 if(TARGET YARP::YARP_math)
@@ -287,10 +271,13 @@ foreach(_f IN LISTS YARP_dev_idl_GEN_FILES)
   endif()
 endforeach()
 
+#message ("YARP_dev_idl_HDRS: ${YARP_dev_idl_HDRS}")
+#message ("YARP_dev_idl_GEN_FILES: ${YARP_dev_idl_GEN_FILES}")
 source_group(
   TREE "${CMAKE_CURRENT_SOURCE_DIR}"
   PREFIX "Source Files"
-  FILES ${YARP_dev_SRCS}
+  FILES
+    ${YARP_dev_SRCS}
 )
 source_group(
   TREE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -311,7 +298,6 @@ source_group(
     ${YARP_dev_devices_SRCS}
     ${YARP_dev_devices_HDRS}
 )
-
 
 target_sources(YARP_dev
   PRIVATE
@@ -336,16 +322,11 @@ target_link_libraries(YARP_dev
     YARP::YARP_conf
     YARP::YARP_os
     YARP::YARP_sig
-  PRIVATE
-    YARP::YARP_rosmsg
 )
 list(APPEND YARP_dev_PUBLIC_DEPS
   YARP_conf
   YARP_os
   YARP_sig
-)
-list(APPEND YARP_dev_PRIVATE_DEPS
-  YARP_rosmsg
 )
 
 if(TARGET YARP::YARP_math)
@@ -360,24 +341,12 @@ if(YARP_HAS_ZLIB)
   list(APPEND YARP_dev_PRIVATE_DEPS ZLIB)
 endif()
 
-set_property(
-  TARGET YARP_dev
-  PROPERTY
-    PUBLIC_HEADER
-      ${YARP_dev_HDRS}
-      ${YARP_dev_idl_HDRS}
-)
-set_property(
-  TARGET YARP_dev
-  PROPERTY
-    PRIVATE_HEADER
-      ${YARP_dev_IMPL_HDRS}
-      ${YARP_dev_idl_IMPL_HDRS}
-)
+#prepare installation
+set_property(TARGET YARP_dev PROPERTY PUBLIC_HEADER ${YARP_dev_HDRS} ${YARP_dev_idl_HDRS})
+set_property(TARGET YARP_dev PROPERTY PRIVATE_HEADER ${YARP_dev_IMPL_HDRS} ${YARP_dev_idl_IMPL_HDRS})
 set_property(TARGET YARP_dev PROPERTY VERSION ${YARP_VERSION_SHORT})
 set_property(TARGET YARP_dev PROPERTY SOVERSION ${YARP_SOVERSION})
 set_property(TARGET YARP_dev PROPERTY FOLDER "Libraries")
-
 
 install(
   TARGETS YARP_dev
@@ -402,3 +371,9 @@ install(
 
 set(YARP_dev_PUBLIC_DEPS ${YARP_dev_PUBLIC_DEPS} PARENT_SCOPE)
 set(YARP_dev_PRIVATE_DEPS ${YARP_dev_PRIVATE_DEPS} PARENT_SCOPE)
+
+###################################################################
+
+if(YARP_COMPILE_TESTS)
+  add_subdirectory(yarp/dev/tests)
+endif()

@@ -41,14 +41,18 @@ public:
     bool detachAll() override;
 
     // yarp::dev::IFrameTransformStorageSet
-    bool setTransform(const yarp::math::FrameTransform& transform) override;
-    bool setTransforms(const std::vector<yarp::math::FrameTransform>& transforms) override;
-    virtual bool deleteTransform(std::string t1, std::string t2) override;
-    virtual bool clearAll() override;
+    yarp::dev::ReturnValue setTransform(const yarp::math::FrameTransform& transform) override;
+    yarp::dev::ReturnValue setTransforms(const std::vector<yarp::math::FrameTransform>& transforms) override;
+    yarp::dev::ReturnValue deleteTransform(std::string t1, std::string t2) override;
+    yarp::dev::ReturnValue clearAll() override;
+
+    void startThreads();
+    void stopThreads();
 
 private:
     int    m_verbose{4};
-    std::vector<IFrameTransformStorageSet*> m_iFrameTransformStorageSetList;
+    std::vector<yarp::dev::IFrameTransformStorageSet*> m_iFrameTransformStorageSetList;
+    std::vector<yarp::dev::IFrameTransformStorageUtils*> m_iFrameTransformStorageUtilsList;
     std::vector<std::vector<yarp::math::FrameTransform>> m_transformVector;
     std::vector<std::mutex> m_mutexSettingFromAttachedDevices;
 };

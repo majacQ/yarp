@@ -35,7 +35,7 @@
 #    ifdef main
 #        undef main
 #    endif
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
 #    include <arpa/inet.h>
 #    include <cstring>
 #    include <sys/socket.h>
@@ -192,10 +192,12 @@ Contact NameConfig::getAddress()
 bool NameConfig::writeConfig(const std::string& fileName, const std::string& text)
 {
     if (yarp::os::mkdir_p(fileName.c_str(), 1) != 0) {
+        yCError(NAMECONFIG, "Unable to create dir for file %s, check your permissions",fileName.c_str());
         return false;
     }
     FILE* fout = fopen(fileName.c_str(), "w");
     if (fout == nullptr) {
+        yCError(NAMECONFIG, "Unable to write file %s, check your permissions",fileName.c_str());
         return false;
     }
     fprintf(fout, "%s", text.c_str());
@@ -332,7 +334,7 @@ bool NameConfig::isLocalName(const std::string& name)
         }
         delete[] ips;
     }
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
     /**
      * If this does not work properly, use a more sophisticated way
      * instead of just gethostname.

@@ -21,7 +21,7 @@ open my $handle, '<', "tests/misc/check_license_skip.txt";
 chomp(my @skip_files = <$handle>);
 close $handle;
 
-my $copyright_iit = "2006-2021 Istituto Italiano di Tecnologia \\(IIT\\)";
+my $copyright_iit = "(2006-2021|2006-2022|2006-2023|2023|2023-2023|2024|2024-2024|2025|2025-2025) Istituto Italiano di Tecnologia \\(IIT\\)";
 my $copyright_robocub = "2006-2010 RobotCub Consortium";
 
 my $str_bsd3_cpp = <<END;
@@ -170,21 +170,43 @@ my $ok = 0;
 my $skip = 0;
 my $errors = 0;
 my $known = 0;
+my $number_files_marked_to_skip = scalar(@skip_files);
+foreach my $skipline (@skip_files) {
+    if (substr ($skipline, -1) eq '/') {
+    $number_files_marked_to_skip--; }
+}
+
+use File::Spec;
 
 foreach my $filename (@files) {
     $files++;
 
-    # For now skip files known to have a broken license
-    my $match = 0;
+    my $match_filename = 0;
+    my $match_dir = 0;
     for (@skip_files) {
+        # skip files known to have a broken license
         if ("$filename" eq "$_") {
-            $match = 1;
+            $match_filename = 1;
+            last;
+        }
+        # skip directories known to contain files which have a broken license
+        my($vol,$dir,$file)    = File::Spec->splitpath($filename);
+        my($vol2,$dir2,$file2) = File::Spec->splitpath($_);
+        # print "testing $dir $dir2 \n";
+        if ("$dir" eq "$_") {
+            $match_dir = 1;
+            $number_files_marked_to_skip++;
             last;
         }
     }
 
-    if( $match ) {
-        print_if_verbose "[SKIP (known)] $filename\n";
+    if( $match_filename ) {
+        print "[SKIP (known file)] $filename\n";
+        $known++;
+        next;
+    }
+    elsif( $match_dir ) {
+        print "[SKIP (known dir)] $filename\n";
         $known++;
         next;
     }
@@ -268,7 +290,7 @@ foreach my $filename (@files) {
 
     # C++ style BSD-3-Clause
     if ("$txt" =~ /$str_bsd3_cpp/s) {
-        if ("$filename" =~ /\.(cpp|cpp.in|c|h|h.in|thrift|mm|qml|java|cs)$/) {
+        if ("$filename" =~ /\.(cpp|cpp.in|c|h|hpp|h.in|thrift|mm|qml|java|cs)$/) {
             print_if_verbose "[OK - BSD (.$1)] $filename\n";
             $ok++;
         } elsif ("$filename" =~ /\/compiler\..+\.in$/) {
@@ -405,8 +427,8 @@ foreach my $filename (@files) {
 
     # GPL3+
     if ("$txt" =~ /$str_gpl3_or_later/s) {
-        if ("$filename" =~ /src\/yarpviz\/.*\.(cpp|h|qml)/ ||
-            "$filename" =~ /src\/yarpscope\/.*\.(cpp|h|qml)/ ||
+        if ("$filename" =~ /src\/guis\/yarpviz\/.*\.(cpp|h|qml)/ ||
+            "$filename" =~ /src\/guis\/yarpscope\/.*\.(cpp|h|qml)/ ||
             "$filename" =~ /example\/ContainerExample\/.*\.(cpp|h|qml)/) {
             # yarpviz and yarpscope are necessarily GPL3+
             print_if_verbose "[OK - GPL3+ (.$1)] $filename\n";
@@ -444,28 +466,29 @@ print_if_verbose "---\n";
 print_if_verbose "FILES:  $files\n";
 print_if_verbose "OK:     $ok\n";
 print_if_verbose "SKIP:   $skip\n";
-print_if_verbose "KNOWN:  $known\n";
+print_if_verbose "KNOWN (COUNTED):  $known\n";
+print_if_verbose "KNOWN (DECLARED FROM FILE):  $number_files_marked_to_skip\n";
 print_if_verbose "ERRORS: $errors\n";
 print_if_verbose "---\n";
 print_if_verbose "\n";
 
 if ($ok + $skip + $known + $errors != $files) {
-    print_if_verbose "[ERROR: Some file was not counted]\n\n";
+    print "[ERROR: Some file was not counted]\n\n";
     exit 1;
 }
 
-if ($known < scalar(@skip_files)) {
-    print_if_verbose "[ERROR: Some known file was not found and the skip file was not updated]\n\n";
+if ($known < $number_files_marked_to_skip) {
+    print "[ERROR: Some known file was not found and the skip file was not updated]\n\n";
     exit 1;
 }
 
-if ($known > scalar(@skip_files)) {
-    print_if_verbose "[ERROR: Some new known file was added and the skip file was not updated]\n\n";
+if ($known > $number_files_marked_to_skip) {
+    print "[ERROR: Some new known file was added and the skip file was not updated]\n\n";
     exit 1;
 }
 
 if ($errors != 0) {
-    print_if_verbose "[ERROR: Some file has an invalid license]\n\n";
+    print "[ERROR: Some file has an invalid license]\n\n";
     exit 1;
 }
 

@@ -121,6 +121,8 @@ target_sources(yarpidl_thrift
     ${yarpidl_thrift_YARP_SRCS}
 )
 
+yarp_enable_windows_longpath_support(yarpidl_thrift)
+
 install(
   TARGETS yarpidl_thrift
   EXPORT YARP_idl_tools
@@ -133,3 +135,7 @@ set_property(TARGET yarpidl_thrift PROPERTY FOLDER "Command Line Tools")
 
 yarp_deprecated_option(THRIFT_USE_EXTERNAL) # Since YARP 3.0.0
 yarp_deprecated_option(THRIFT_ROOT) # Since YARP 3.0.0
+
+if(YARP_COMPILE_TESTS)
+  add_subdirectory(tests)
+endif()

@@ -41,9 +41,7 @@ public:
     bool detachAll() override;
 
     // yarp::dev::IFrameTransformStorageGet
-    bool getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const override;
-
-    // yarp::os::PeriodicThread
+    yarp::dev::ReturnValue getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const override;
 
 private:
     int    m_verbose{4};

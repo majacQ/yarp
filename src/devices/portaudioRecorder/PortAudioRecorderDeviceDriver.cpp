@@ -133,22 +133,11 @@ PortAudioRecorderDeviceDriver::~PortAudioRecorderDeviceDriver()
 
 bool PortAudioRecorderDeviceDriver::open(yarp::os::Searchable& config)
 {
-    if (config.check("help"))
-    {
-        yCInfo(PORTAUDIORECORDER, "Some examples:");
-        yCInfo(PORTAUDIORECORDER, "yarpdev --device portaudioRecorder --help");
-        yCInfo(PORTAUDIORECORDER, "yarpdev --device AudioRecorderWrapper --subdevice portaudioRecorder --start");
-        return false;
-    }
-
-    bool b = configureRecorderAudioDevice(config.findGroup("AUDIO_BASE"),"portaudioRecorder");
+    bool b = parseParams(config);
     if (!b) { return false; }
 
-    m_device_id = config.check("id", Value(-1), "which portaudio index to use (-1=automatic)").asInt32();
-    m_driver_frame_size = config.check("driver_frame_size", Value(0), "").asInt32();
-    if (m_driver_frame_size == 0) {
-        m_driver_frame_size = DEFAULT_FRAMES_PER_BUFFER;
-    }
+    b = configureRecorderAudioDevice(config.findGroup("AUDIO_BASE"),"portaudioRecorder");
+    if (!b) { return false; }
 
     m_err = Pa_Initialize();
     if(m_err != paNoError )
@@ -157,14 +146,19 @@ bool PortAudioRecorderDeviceDriver::open(yarp::os::Searchable& config)
         return false;
     }
 
-    m_inputParameters.device = (m_device_id ==-1)?Pa_GetDefaultInputDevice(): m_device_id;
-    yCInfo(PORTAUDIORECORDER, "Device number %d", m_inputParameters.device);
+    m_inputParameters.device = (m_audio_device_id == -1) ? Pa_GetDefaultInputDevice() : m_audio_device_id;
     m_inputParameters.channelCount = static_cast<int>(m_audiorecorder_cfg.numChannels);
     m_inputParameters.sampleFormat = PA_SAMPLE_TYPE;
-    if ((Pa_GetDeviceInfo(m_inputParameters.device ))!=nullptr) {
-        m_inputParameters.suggestedLatency = Pa_GetDeviceInfo(m_inputParameters.device )->defaultLowInputLatency;
-    }
     m_inputParameters.hostApiSpecificStreamInfo = nullptr;
+
+    const PaDeviceInfo* devinfo = Pa_GetDeviceInfo(m_inputParameters.device);
+    std::string devname = "unknown";
+    if (devinfo != nullptr)
+    {
+        m_inputParameters.suggestedLatency = devinfo->defaultLowInputLatency;
+        devname = devinfo->name;
+    }
+    yCInfo(PORTAUDIORECORDER, "Selected device: number: %d, name: %s", m_inputParameters.device, devname.c_str());
 
     m_err = Pa_OpenStream(
               &m_stream,
@@ -226,28 +220,28 @@ bool PortAudioRecorderDeviceDriver::close()
     return (m_err==paNoError);
 }
 
-bool PortAudioRecorderDeviceDriver::startRecording()
+ReturnValue PortAudioRecorderDeviceDriver::startRecording()
 {
     AudioRecorderDeviceBase::startRecording();
     m_err = Pa_StartStream(m_stream );
-    if(m_err < 0 ) {handleError(); return false;}
+    if(m_err < 0 ) {handleError(); return ReturnValue::return_code::return_value_error_method_failed;}
     yCInfo(PORTAUDIORECORDER) << "started recording";
-    return true;
+    return ReturnValue_ok;
 }
 
-bool PortAudioRecorderDeviceDriver::setHWGain(double gain)
+ReturnValue PortAudioRecorderDeviceDriver::setHWGain(double gain)
 {
     yCInfo(PORTAUDIORECORDER) << "not yet implemented recording";
-    return false;
+    return ReturnValue::return_code::return_value_error_not_implemented_by_device;
 }
 
-bool PortAudioRecorderDeviceDriver::stopRecording()
+ReturnValue PortAudioRecorderDeviceDriver::stopRecording()
 {
     AudioRecorderDeviceBase::stopRecording();
     m_err = Pa_StopStream(m_stream );
-    if(m_err < 0 ) {handleError(); return false;}
+    if(m_err < 0 ) {handleError(); return ReturnValue::return_code::return_value_error_method_failed;}
     yCInfo(PORTAUDIORECORDER) << "stopped recording";
-    return true;
+    return ReturnValue_ok;
 }
 
 void PortAudioRecorderDeviceDriver::threadRelease()

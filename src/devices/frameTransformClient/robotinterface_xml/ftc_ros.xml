@@ -12,6 +12,7 @@
     <param name="setDeviceName"> ftc_mpxSet  </param>
     <devices>
         <!-- **************** ROS NWC **************** -->
+        <param extern-name="FrameTransform_verbose_debug" name="FrameTransform_verbose_debug">0</param>
         <device name="ftSet_nwc_ros" type="frameTransformSet_nwc_ros">
             <group name="GENERAL">
                 <param extern-name="ftSet_period" name="period"> 0.01 </param>
@@ -37,6 +38,7 @@
         </device>
         <!-- **************** STORAGE **************** -->
         <device name="ftc_storage" type="frameTransformStorage">
+            <param extern-name="ftc_storage_timeout" name="FrameTransform_container_timeout"> 0.2 </param>
             <action phase="startup" level="5" type="attach">
                 <paramlist name="networks">
                     <elem name="subdevicegetros"> ftGet_nwc_ros </elem>

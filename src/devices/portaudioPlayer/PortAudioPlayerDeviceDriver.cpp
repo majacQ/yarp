@@ -40,8 +40,6 @@ typedef unsigned char SAMPLE;
 #define SAMPLE_UNSIGNED
 #endif
 
-#define DEFAULT_FRAMES_PER_BUFFER (512)
-
 namespace {
 YARP_LOG_COMPONENT(PORTAUDIOPLAYER, "yarp.devices.portaudioPlayer")
 }
@@ -206,7 +204,7 @@ bool PortAudioPlayerDeviceDriver::interruptDeviceAndClose()
 
 bool PortAudioPlayerDeviceDriver::configureDeviceAndStart()
 {
-    AudioBufferSize playback_buffer_size(m_audioplayer_cfg.numSamples, m_audioplayer_cfg.numChannels, m_audioplayer_cfg.bytesPerSample);
+    yarp::sig::AudioBufferSize playback_buffer_size(m_audioplayer_cfg.numSamples, m_audioplayer_cfg.numChannels, m_audioplayer_cfg.bytesPerSample);
     if (m_outputBuffer == nullptr) {
         m_outputBuffer = new CircularAudioBuffer_16t("portatudio_play", playback_buffer_size);
     }
@@ -218,11 +216,19 @@ bool PortAudioPlayerDeviceDriver::configureDeviceAndStart()
         return false;
     }
 
-    m_outputParameters.device = (m_device_id == -1) ? Pa_GetDefaultOutputDevice() : m_device_id;
+    m_outputParameters.device = (m_audio_device_id == -1) ? Pa_GetDefaultOutputDevice() : m_audio_device_id;
     m_outputParameters.channelCount = static_cast<int>(m_audioplayer_cfg.numChannels);
     m_outputParameters.sampleFormat = PA_SAMPLE_TYPE;
-    m_outputParameters.suggestedLatency = Pa_GetDeviceInfo(m_outputParameters.device)->defaultLowOutputLatency;
     m_outputParameters.hostApiSpecificStreamInfo = nullptr;
+
+    const PaDeviceInfo* devinfo = Pa_GetDeviceInfo(m_outputParameters.device);
+    std::string devname = "unknown";
+    if (devinfo != nullptr)
+    {
+        m_outputParameters.suggestedLatency = devinfo->defaultLowOutputLatency;
+        devname = devinfo->name;
+    }
+    yCInfo(PORTAUDIOPLAYER, "Selected device: number: %d, name: %s", m_outputParameters.device, devname.c_str());
 
     m_err = Pa_OpenStream(
         &m_stream,
@@ -249,22 +255,11 @@ bool PortAudioPlayerDeviceDriver::configureDeviceAndStart()
 
 bool PortAudioPlayerDeviceDriver::open(yarp::os::Searchable& config)
 {
-    if (config.check("help"))
-    {
-        yCInfo(PORTAUDIOPLAYER, "Some examples:");
-        yCInfo(PORTAUDIOPLAYER, "yarpdev --device portaudioPlayer --help");
-        yCInfo(PORTAUDIOPLAYER, "yarpdev --device AudioPlayerWrapper --subdevice portaudioPlayer --start");
-        return false;
-    }
-
-    bool b = configurePlayerAudioDevice(config.findGroup("AUDIO_BASE"), "portaudioPlayer");
+    bool b = parseParams(config);
     if (!b) { return false; }
 
-    m_device_id = config.check("id", Value(-1), "which portaudio index to use (-1=automatic)").asInt32();
-    m_driver_frame_size = config.check("driver_frame_size", Value(0), "").asInt32();
-    if (m_driver_frame_size == 0) {
-        m_driver_frame_size = DEFAULT_FRAMES_PER_BUFFER;
-    }
+    b = configurePlayerAudioDevice(config.findGroup("AUDIO_BASE"), "portaudioPlayer");
+    if (!b) { return false; }
 
     b = configureDeviceAndStart();
     return (m_err==paNoError);
@@ -304,10 +299,10 @@ bool PortAudioPlayerDeviceDriver::abortSound()
     return (m_err==paNoError);
 }
 
-bool PortAudioPlayerDeviceDriver::setHWGain(double gain)
+ReturnValue PortAudioPlayerDeviceDriver::setHWGain(double gain)
 {
     yCError(PORTAUDIOPLAYER, "Not yet implemented");
-    return false;
+    return ReturnValue::return_code::return_value_error_not_implemented_by_device;
 }
 
 void PortAudioPlayerDeviceDriver::waitUntilPlaybackStreamIsComplete()
@@ -322,20 +317,20 @@ void PortAudioPlayerDeviceDriver::waitUntilPlaybackStreamIsComplete()
     }
 }
 
-bool PortAudioPlayerDeviceDriver::startPlayback()
+ReturnValue PortAudioPlayerDeviceDriver::startPlayback()
 {
     AudioPlayerDeviceBase::startPlayback();
     m_err = Pa_StartStream(m_stream);
-    if (m_err < 0) { handleError(); return false; }
+    if (m_err < 0) { handleError(); return ReturnValue::return_code::return_value_error_method_failed; }
     yCInfo(PORTAUDIOPLAYER) << "started playback";
-    return true;
+    return ReturnValue_ok;
 }
 
-bool PortAudioPlayerDeviceDriver::stopPlayback()
+ReturnValue PortAudioPlayerDeviceDriver::stopPlayback()
 {
     AudioPlayerDeviceBase::stopPlayback();
     m_err = Pa_StopStream(m_stream);
-    if (m_err < 0) { handleError(); return false; }
+    if (m_err < 0) { handleError(); return ReturnValue::return_code::return_value_error_method_failed; }
     yCInfo(PORTAUDIOPLAYER) << "stopped playback";
-    return true;
+    return ReturnValue_ok;
 }

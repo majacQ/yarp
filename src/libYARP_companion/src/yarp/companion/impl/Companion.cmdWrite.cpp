@@ -9,6 +9,10 @@
 #include <yarp/os/Port.h>
 #include <yarp/os/SystemClock.h>
 #include <yarp/os/impl/Terminal.h>
+#include <yarp/os/Network.h>
+#include <yarp/os/LogStream.h>
+#include <yarp/os/PeriodicThread.h>
+#include <yarp/os/Semaphore.h>
 
 #ifdef YARP_HAS_Libedit
 #include <yarp/conf/dirs.h>
@@ -24,9 +28,43 @@ using yarp::companion::impl::Companion;
 using yarp::os::Bottle;
 using yarp::os::Port;
 using yarp::os::SystemClock;
+using yarp::os::NetworkBase;
 
-int Companion::write(const char *name, int ntargets, char *targets[]) {
+class writerThread : public yarp::os::PeriodicThread
+{
+    private:
+    Port* outport=nullptr;
+    Bottle bot;
+    std::mutex mut;
+
+    public:
+    writerThread (double period, Port* _outport) : yarp::os::PeriodicThread(period)
+    {
+        outport = _outport;
+    }
+
+    void run() override
+    {
+        mut.lock();
+        if (outport && bot.size()!=0)
+        {
+            outport->write(bot);
+        }
+        mut.unlock();
+    }
+
+    void write(Bottle& _bot)
+    {
+        mut.lock();
+        bot = _bot;
+        mut.unlock();
+    }
+};
+
+int Companion::write(const char *name, int ntargets, char *targets[], double period)
+{
     Port port;
+    writerThread* writer_thread = nullptr;
     applyArgs(port);
     port.setWriteOnly();
 #ifdef YARP_HAS_Libedit
@@ -80,6 +118,11 @@ int Companion::write(const char *name, int ntargets, char *targets[]) {
         }
     }
 
+    if (period>0)
+    {
+        writer_thread = new writerThread(period, &port);
+        writer_thread->start();
+    }
 
     while (!yarp::os::impl::Terminal::EOFreached()) {
         std::string txt = yarp::os::impl::Terminal::getStdin();
@@ -97,7 +140,7 @@ int Companion::write(const char *name, int ntargets, char *targets[]) {
             } else {
                 bot.fromString(txt);
             }
-            //core.send(bot);
+
             if (waitConnect) {
                 double delay = 0.1;
                 while (port.getOutputCount()<1) {
@@ -108,7 +151,16 @@ int Companion::write(const char *name, int ntargets, char *targets[]) {
                     }
                 }
             }
-            port.write(bot);
+
+            if (writer_thread)
+            {
+                writer_thread->write(bot);
+            }
+            else
+            {
+                port.write(bot);
+            }
+
 #ifdef YARP_HAS_Libedit
             if (!disable_file_history) {
                 write_history(hist_file.c_str());
@@ -134,13 +186,18 @@ int Companion::write(const char *name, int ntargets, char *targets[]) {
         Bottle bot;
         bot.addInt32(1);
         bot.addString("<EOF>");
-        //core.send(bot);
         port.write(bot);
     }
 
-    //core.close();
-    //core.join();
-    port.close();
+    if (writer_thread)
+    {
+        writer_thread->stop();
+        delete writer_thread;
+    }
+    else
+    {
+        port.close();
+    }
 
     return 0;
 }
@@ -148,11 +205,58 @@ int Companion::write(const char *name, int ntargets, char *targets[]) {
 
 int Companion::cmdWrite(int argc, char *argv[])
 {
-    if (argc<1) {
-        yCError(COMPANION, "Please supply the port name, and optionally some targets");
+    if (argc<1)
+    {
+        yCError(COMPANION, "Usage:");
+        yCError(COMPANION, "Please supply the port name, and optionally some targets, e.g.");
+        yCError(COMPANION, "  yarp write <port> [remote port1] [remote port2] [...] [--period <s>]");
+        yCError(COMPANION, "If the period optional parameter is given, then the message is written periodically");
         return 1;
     }
 
+    //get the name of the source port
     const char *src = argv[0];
-    return write(src, argc-1, argv+1);
+
+    //the following check prevents opening as local port a port which is already registered (and active) on the yarp nameserver
+    bool e = NetworkBase::exists(src, true);
+    if (e)
+    {
+        yCError(COMPANION) << "Port" << src << "already exists! Aborting...";
+        return 1;
+    }
+
+    if(argc >= 2) {
+        //parsing of the period option
+        double period = 0;
+        //check a malformed command line in which the --period is specified, but with no value.
+        if (strcmp(argv[argc - 1], "--period") == 0)
+        {
+            yCError(COMPANION, "Invalid period value");
+            return 1;
+        }
+        //check if the period option is the present
+        if (strcmp(argv[argc -2 ],"--period")==0)
+        {
+            //get the value of the --period option
+            double pp=atof(argv[argc - 1]);
+            if (pp>=0)
+            {
+                period = pp;
+                yCInfo(COMPANION, "Message will be published with a period of %f s", period);
+            }
+            else
+            {
+                yCError(COMPANION, "Invalid period value");
+                return 1;
+            }
+
+            //remove the --period option and its following value from argc, argv
+            argc--;
+            argc--;
+        }
+
+        return write(src, argc-1, argv+1, period);
+    }
+
+    return write(src, argc-1, argv+1, 0);
 }

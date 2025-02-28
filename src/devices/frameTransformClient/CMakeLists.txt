@@ -7,16 +7,19 @@ yarp_prepare_plugin(frameTransformClient
   INCLUDE FrameTransformClient.h
   DEPENDS "TARGET YARP::YARP_math"
   DEFAULT ON
+  GENERATE_PARSER
 )
 
 if(NOT SKIP_frameTransformClient)
   yarp_add_plugin(yarp_frameTransformClient)
 
-  target_sources(yarp_frameTransformClient PRIVATE FrameTransformClient.cpp
-          FrameTransformClient.h)
+  target_sources(yarp_frameTransformClient PRIVATE
+      FrameTransformClient.cpp
+      FrameTransformClient.h
+      FrameTransformClient_ParamsParser.cpp
+      FrameTransformClient_ParamsParser.h
+  )
 
-  target_sources(yarp_frameTransformClient PRIVATE $<TARGET_OBJECTS:FrameTransformUtils>)
-  target_include_directories(yarp_frameTransformClient PRIVATE $<TARGET_PROPERTY:FrameTransformUtils,INTERFACE_INCLUDE_DIRECTORIES>)
 
   target_link_libraries(yarp_frameTransformClient
     PRIVATE
@@ -48,6 +51,8 @@ if(NOT SKIP_frameTransformClient)
     robotinterface_xml/ftc_yarp_only_single_client.xml
     robotinterface_xml/ftc_local_only.xml
   )
+  set_property(TARGET frameTransformRC PROPERTY FOLDER "Plugins/Device/Resources")
+
   target_sources(yarp_frameTransformClient PRIVATE $<TARGET_OBJECTS:frameTransformRC>)
   target_include_directories(yarp_frameTransformClient PRIVATE $<TARGET_PROPERTY:frameTransformRC,INTERFACE_INCLUDE_DIRECTORIES>)
 
@@ -63,4 +68,9 @@ if(NOT SKIP_frameTransformClient)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_frameTransformClient PROPERTY FOLDER "Plugins/Device")
+
+  if(YARP_COMPILE_TESTS)
+    add_subdirectory(tests)
+  endif()
+
 endif()

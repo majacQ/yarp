@@ -27,7 +27,8 @@ void print_callback(yarp::os::Log::LogType type,
                     double systemtime,
                     double networktime,
                     double externaltime,
-                    const char* comp_name)
+                    const char* comp_name,
+                    const char* id)
 {
     YARP_UNUSED(type);
     YARP_UNUSED(file);
@@ -37,6 +38,7 @@ void print_callback(yarp::os::Log::LogType type,
     YARP_UNUSED(networktime);
     YARP_UNUSED(externaltime);
     YARP_UNUSED(comp_name);
+    YARP_UNUSED(id);
     static const char* err_str = "[ERROR] ";
     static const char* warn_str = "[WARNING] ";
     static const char* no_str = "";
@@ -157,6 +159,7 @@ Companion::Companion() :
     add("rpc",             &Companion::cmdRpc,            "write commands to a port, and read replies");
     add("rpcserver",       &Companion::cmdRpcServer,      "make a test RPC server to receive and reply to Bottle-format messages");
     add("sample",          &Companion::cmdSample,         "drop or duplicate messages to achieve a constant frame-rate");
+    add("split",           &Companion::cmdSplit,          "splits data received in a bottle onto multiple ports, one for each element");
     add("stats",           &Companion::cmdStats,          "print statics about the data received from a specific port");
     add("priority-sched",  &Companion::cmdPrioritySched,  "set/get the thread policy and priority for a given connection");
     add("terminate",       &Companion::cmdTerminate,      "terminate a yarp-terminate-aware process by name");

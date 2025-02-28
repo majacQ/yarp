@@ -12,6 +12,8 @@
 
 #include <yarp/os/idl/WireTypes.h>
 
+#include <algorithm>
+
 // step helper class declaration
 class yarpdataplayer_console_IDL_step_helper :
         public yarp::os::Portable
@@ -1082,7 +1084,7 @@ public:
         bool readTag(yarp::os::idl::WireReader& reader);
         bool readArgs(yarp::os::idl::WireReader& reader);
 
-        std::int32_t steps{0};
+        std::int32_t steps{5};
     };
 
     class Reply :
@@ -1149,7 +1151,7 @@ public:
         bool readTag(yarp::os::idl::WireReader& reader);
         bool readArgs(yarp::os::idl::WireReader& reader);
 
-        std::int32_t steps{0};
+        std::int32_t steps{5};
     };
 
     class Reply :
@@ -1497,7 +1499,7 @@ bool yarpdataplayer_console_IDL_step_helper::Command::read(yarp::os::idl::WireRe
 
 bool yarpdataplayer_console_IDL_step_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -1643,7 +1645,7 @@ bool yarpdataplayer_console_IDL_setFrame_helper::Command::read(yarp::os::idl::Wi
 
 bool yarpdataplayer_console_IDL_setFrame_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -1797,7 +1799,7 @@ bool yarpdataplayer_console_IDL_getFrame_helper::Command::read(yarp::os::idl::Wi
 
 bool yarpdataplayer_console_IDL_getFrame_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -1951,7 +1953,7 @@ bool yarpdataplayer_console_IDL_load_helper::Command::read(yarp::os::idl::WireRe
 
 bool yarpdataplayer_console_IDL_load_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2092,7 +2094,7 @@ bool yarpdataplayer_console_IDL_play_helper::Command::read(yarp::os::idl::WireRe
 
 bool yarpdataplayer_console_IDL_play_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2225,7 +2227,7 @@ bool yarpdataplayer_console_IDL_pause_helper::Command::read(yarp::os::idl::WireR
 
 bool yarpdataplayer_console_IDL_pause_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2358,7 +2360,7 @@ bool yarpdataplayer_console_IDL_stop_helper::Command::read(yarp::os::idl::WireRe
 
 bool yarpdataplayer_console_IDL_stop_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2504,7 +2506,7 @@ bool yarpdataplayer_console_IDL_enable_helper::Command::read(yarp::os::idl::Wire
 
 bool yarpdataplayer_console_IDL_enable_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2658,7 +2660,7 @@ bool yarpdataplayer_console_IDL_disable_helper::Command::read(yarp::os::idl::Wir
 
 bool yarpdataplayer_console_IDL_disable_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2799,7 +2801,7 @@ bool yarpdataplayer_console_IDL_getAllParts_helper::Command::read(yarp::os::idl:
 
 bool yarpdataplayer_console_IDL_getAllParts_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -2837,11 +2839,11 @@ bool yarpdataplayer_console_IDL_getAllParts_helper::Reply::write(const yarp::os:
         if (!writer.writeListHeader(s_reply_len)) {
             return false;
         }
-        if (!writer.writeListBegin(BOTTLE_TAG_STRING, static_cast<uint32_t>(return_helper.size()))) {
+        if (!writer.writeListBegin(BOTTLE_TAG_STRING, return_helper.size())) {
             return false;
         }
-        for (const auto& _item0 : return_helper) {
-            if (!writer.writeString(_item0)) {
+        for (const auto& _item : return_helper) {
+            if (!writer.writeString(_item, true)) {
                 return false;
             }
         }
@@ -2861,17 +2863,23 @@ bool yarpdataplayer_console_IDL_getAllParts_helper::Reply::read(yarp::os::idl::W
         reader.fail();
         return false;
     }
-    return_helper.clear();
-    uint32_t _size1;
-    yarp::os::idl::WireState _etype4;
-    reader.readListBegin(_etype4, _size1);
-    return_helper.resize(_size1);
-    for (size_t _i5 = 0; _i5 < _size1; ++_i5) {
+    size_t _csize;
+    yarp::os::idl::WireState _etype;
+    reader.readListBegin(_etype, _csize);
+    // WireReader removes BOTTLE_TAG_LIST from the tag
+    constexpr int expected_tag = ((BOTTLE_TAG_STRING) & (~BOTTLE_TAG_LIST));
+    if constexpr (expected_tag != 0) {
+        if (_csize != 0 && _etype.code != expected_tag) {
+            return false;
+        }
+    }
+    return_helper.resize(_csize);
+    for (size_t _i = 0; _i < _csize; ++_i) {
         if (reader.noMore()) {
             reader.fail();
             return false;
         }
-        if (!reader.readString(return_helper[_i5])) {
+        if (!reader.readString(return_helper[_i])) {
             reader.fail();
             return false;
         }
@@ -2965,7 +2973,7 @@ bool yarpdataplayer_console_IDL_getPortName_helper::Command::read(yarp::os::idl:
 
 bool yarpdataplayer_console_IDL_getPortName_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3123,7 +3131,7 @@ bool yarpdataplayer_console_IDL_setPortName_helper::Command::read(yarp::os::idl:
 
 bool yarpdataplayer_console_IDL_setPortName_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3285,7 +3293,7 @@ bool yarpdataplayer_console_IDL_setSpeed_helper::Command::read(yarp::os::idl::Wi
 
 bool yarpdataplayer_console_IDL_setSpeed_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3426,7 +3434,7 @@ bool yarpdataplayer_console_IDL_getSpeed_helper::Command::read(yarp::os::idl::Wi
 
 bool yarpdataplayer_console_IDL_getSpeed_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3572,7 +3580,7 @@ bool yarpdataplayer_console_IDL_repeat_helper::Command::read(yarp::os::idl::Wire
 
 bool yarpdataplayer_console_IDL_repeat_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3721,7 +3729,7 @@ bool yarpdataplayer_console_IDL_setStrict_helper::Command::read(yarp::os::idl::W
 
 bool yarpdataplayer_console_IDL_setStrict_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -3870,7 +3878,7 @@ bool yarpdataplayer_console_IDL_forward_helper::Command::read(yarp::os::idl::Wir
 
 bool yarpdataplayer_console_IDL_forward_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4019,7 +4027,7 @@ bool yarpdataplayer_console_IDL_backward_helper::Command::read(yarp::os::idl::Wi
 
 bool yarpdataplayer_console_IDL_backward_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4155,7 +4163,7 @@ bool yarpdataplayer_console_IDL_getProgress_helper::Command::read(yarp::os::idl:
 
 bool yarpdataplayer_console_IDL_getProgress_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4288,7 +4296,7 @@ bool yarpdataplayer_console_IDL_getStatus_helper::Command::read(yarp::os::idl::W
 
 bool yarpdataplayer_console_IDL_getStatus_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4421,7 +4429,7 @@ bool yarpdataplayer_console_IDL_resume_helper::Command::read(yarp::os::idl::Wire
 
 bool yarpdataplayer_console_IDL_resume_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4554,7 +4562,7 @@ bool yarpdataplayer_console_IDL_quit_helper::Command::read(yarp::os::idl::WireRe
 
 bool yarpdataplayer_console_IDL_quit_helper::Command::readTag(yarp::os::idl::WireReader& reader)
 {
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(s_tag_len);
     if (reader.isError()) {
         return false;
     }
@@ -4981,6 +4989,9 @@ std::vector<std::string> yarpdataplayer_console_IDL::help(const std::string& fun
 // read from ConnectionReader
 bool yarpdataplayer_console_IDL::read(yarp::os::ConnectionReader& connection)
 {
+    constexpr size_t max_tag_len = 1;
+    size_t tag_len = 1;
+
     yarp::os::idl::WireReader reader(connection);
     reader.expectAccept();
     if (!reader.readListHeader()) {
@@ -4988,12 +4999,12 @@ bool yarpdataplayer_console_IDL::read(yarp::os::ConnectionReader& connection)
         return false;
     }
 
-    std::string tag = reader.readTag();
+    std::string tag = reader.readTag(1);
     bool direct = (tag == "__direct__");
     if (direct) {
-        tag = reader.readTag();
+        tag = reader.readTag(1);
     }
-    while (!reader.isError()) {
+    while (tag_len <= max_tag_len && !reader.isError()) {
         if (tag == yarpdataplayer_console_IDL_step_helper::s_tag) {
             yarpdataplayer_console_IDL_step_helper helper;
             if (!helper.cmd.readArgs(reader)) {
@@ -5338,7 +5349,7 @@ bool yarpdataplayer_console_IDL::read(yarp::os::ConnectionReader& connection)
                 if (!writer.writeTag("many", 1, 0)) {
                     return false;
                 }
-                if (!writer.writeListBegin(BOTTLE_TAG_INT32, static_cast<uint32_t>(help_strings.size()))) {
+                if (!writer.writeListBegin(0, help_strings.size())) {
                     return false;
                 }
                 for (const auto& help_string : help_strings) {
@@ -5357,11 +5368,12 @@ bool yarpdataplayer_console_IDL::read(yarp::os::ConnectionReader& connection)
             reader.fail();
             return false;
         }
-        std::string next_tag = reader.readTag();
+        std::string next_tag = reader.readTag(1);
         if (next_tag.empty()) {
             break;
         }
         tag.append("_").append(next_tag);
+        tag_len = std::count(tag.begin(), tag.end(), '_') + 1;
     }
     return false;
 }

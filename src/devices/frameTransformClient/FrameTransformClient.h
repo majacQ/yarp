@@ -20,7 +20,6 @@
 #include <yarp/dev/IFrameTransform.h>
 #include <yarp/dev/IFrameTransformClientControl.h>
 #include <yarp/dev/IFrameTransformStorage.h>
-#include <yarp/dev/IPreciselyTimed.h>
 #include <yarp/dev/PolyDriver.h>
 
 #include <yarp/math/FrameTransform.h>
@@ -29,7 +28,8 @@
 #include <yarp/robotinterface/Param.h>
 #include <yarp/robotinterface/XMLReader.h>
 
-#include <FrameTransformContainer.h>
+#include <yarp/dev/FrameTransformContainer.h>
+#include "FrameTransformClient_ParamsParser.h"
 #include <mutex>
 
 #define DEFAULT_THREAD_PERIOD 20 //ms
@@ -43,32 +43,16 @@ const int MAX_PORTS = 5;
  * \brief `frameTransformClient`: A client to manage FrameTransforms for a robot
  * (For more information, go to \ref FrameTransform)
  *
- *   Parameters required by this device are:
- * | Parameter name   | SubParameter         | Type    | Units          | Default Value         | Required     | Description                                                                                                |
- * |:----------------:|:--------------------:|:-------:|:--------------:|:---------------------:|:-----------: |:----------------------------------------------------------------------------------------------------------:|
- * | filexml_option   | -                    | string  | -              | ftc_local_only.xml    | no           | The name of the xml file containing the needed client configuration                                        |
- * | testxml_option   | -                    | string  | -              | -                     | no           | NB: FOR TEST ONLY. The absolute path of the xml file containing the configuration to test                  |
- * | period           | -                    | float   | -              | 10ms                  | no           | The period for publishing individual tfs on port                                                           |
- * | ft_client_prefix | -                    | string  | -              | ""                    | no           | A prefix to add to the names of all the ports opened by the NWCs instantiated by the frameTransformClient  |
- * | ft_server_prefix | -                    | string  | -              | ""                    | no           | The prefix added to all the names of the ports opened by the NWSs instantiated by the frameTransformServer |
+ * Parameters required by this device are shown in class: FrameTransformClient_ParamsParser
  *
- * Example of command line:
- * \code{.unparsed}
- * yarpdev --device frameTransformClient --filexml_option ftc_local_only.xml
- * \endcode
- *
- * Example of configuration file using .ini format.
- * \code{.unparsed}
- * device frameTransformClient
- * filexml_option ftc_local_only.xml
- * \endcode
  */
 
 class FrameTransformClient :
         public yarp::dev::DeviceDriver,
         public yarp::dev::IFrameTransform,
         public yarp::os::PortReader,
-        public yarp::os::PeriodicThread
+        public yarp::os::PeriodicThread,
+        public FrameTransformClient_ParamsParser
 {
 private:
     enum class ConnectionType {DISCONNECTED = 0, DIRECT, INVERSE, UNDIRECT, IDENTITY};
@@ -82,7 +66,6 @@ protected:
 
     yarp::os::Port      m_rpc_InterfaceToUser;
     std::string         m_local_name;
-    double              m_period;
     std::mutex          m_rpc_mutex;
 
     //ports to broadcast stuff...
@@ -123,20 +106,20 @@ public:
     bool read(yarp::os::ConnectionReader& connection) override;
 
     //IFrameTransform
-    bool     allFramesAsString(std::string &all_frames) override;
-    bool     canTransform(const std::string &target_frame, const std::string &source_frame) override;
-    bool     clear() override;
-    bool     frameExists(const std::string &frame_id) override;
-    bool     getAllFrameIds(std::vector< std::string > &ids) override;
-    bool     getParent(const std::string &frame_id, std::string &parent_frame_id) override;
-    bool     getTransform(const std::string &target_frame_id, const std::string &source_frame_id, yarp::sig::Matrix &transform) override;
-    bool     setTransform(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Matrix &transform) override;
-    bool     setTransformStatic(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Matrix &transform) override;
-    bool     deleteTransform(const std::string &target_frame_id, const std::string &source_frame_id) override;
-    bool     transformPoint(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Vector &input_point, yarp::sig::Vector &transformed_point) override;
-    bool     transformPose(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Vector &input_pose, yarp::sig::Vector &transformed_pose) override;
-    bool     transformQuaternion(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::math::Quaternion &input_quaternion, yarp::math::Quaternion &transformed_quaternion) override;
-    bool     waitForTransform(const std::string &target_frame_id, const std::string &source_frame_id, const double &timeout) override;
+    yarp::dev::ReturnValue  allFramesAsString(std::string &all_frames) override;
+    yarp::dev::ReturnValue  canTransform(const std::string &target_frame, const std::string &source_frame, bool& exists) override;
+    yarp::dev::ReturnValue  clear() override;
+    yarp::dev::ReturnValue  frameExists(const std::string &frame_id, bool& exists) override;
+    yarp::dev::ReturnValue  getAllFrameIds(std::vector< std::string > &ids) override;
+    yarp::dev::ReturnValue  getParent(const std::string &frame_id, std::string &parent_frame_id) override;
+    yarp::dev::ReturnValue  getTransform(const std::string &target_frame_id, const std::string &source_frame_id, yarp::sig::Matrix &transform) override;
+    yarp::dev::ReturnValue  setTransform(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Matrix &transform) override;
+    yarp::dev::ReturnValue  setTransformStatic(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Matrix &transform) override;
+    yarp::dev::ReturnValue  deleteTransform(const std::string &target_frame_id, const std::string &source_frame_id) override;
+    yarp::dev::ReturnValue  transformPoint(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Vector &input_point, yarp::sig::Vector &transformed_point) override;
+    yarp::dev::ReturnValue  transformPose(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::sig::Vector &input_pose, yarp::sig::Vector &transformed_pose) override;
+    yarp::dev::ReturnValue  transformQuaternion(const std::string &target_frame_id, const std::string &source_frame_id, const yarp::math::Quaternion &input_quaternion, yarp::math::Quaternion &transformed_quaternion) override;
+    yarp::dev::ReturnValue  waitForTransform(const std::string &target_frame_id, const std::string &source_frame_id, const double &timeout) override;
 
     //PeriodicThread
     bool     threadInit() override;

@@ -257,15 +257,15 @@ int ThreadImpl::setPriority(int priority, int policy)
         if (std::is_same<std::thread::native_handle_type, ACE_hthread_t>::value) {
             return ACE_Thread::setprio(thread.native_handle(), priority, policy);
         }
-        yCError(THREADIMPL, "Cannot set priority without ACE");
-#elif defined(__unix__)
+        yCError(THREADIMPL, "Cannot set priority as std::thread::native_handle_type is not ACE_hthread_t");
+#elif defined(__unix__) || defined(__APPLE__)
         if (std::is_same<std::thread::native_handle_type, pthread_t>::value) {
             struct sched_param thread_param;
             thread_param.sched_priority = priority;
             int ret = pthread_setschedparam(thread.native_handle(), policy, &thread_param);
             return (ret != 0) ? -1 : 0;
         } else {
-            yCError(THREADIMPL, "Cannot set priority without ACE");
+            yCError(THREADIMPL, "Cannot set priority as std::thread::native_handle_type is not pthread_t");
         }
 #else
         yCError(THREADIMPL, "Cannot set priority without ACE");
@@ -284,7 +284,7 @@ int ThreadImpl::getPriority()
         } else {
             yCError(THREADIMPL, "Cannot get priority without ACE");
         }
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
         if (std::is_same<std::thread::native_handle_type, pthread_t>::value) {
             struct sched_param thread_param;
             int policy;
@@ -312,7 +312,7 @@ int ThreadImpl::getPolicy()
         } else {
             yCError(THREADIMPL, "Cannot get scheduling policy without ACE");
         }
-#elif defined(__unix__)
+#elif defined(__unix__) || defined(__APPLE__)
         if (std::is_same<std::thread::native_handle_type, pthread_t>::value) {
             struct sched_param thread_param;
             if (pthread_getschedparam(thread.native_handle(), &policy, &thread_param) != 0) {

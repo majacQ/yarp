@@ -3,8 +3,9 @@
 
 yarp_prepare_plugin(audioToFileDevice
   CATEGORY device
-  TYPE audioToFileDevice
-  INCLUDE audioToFileDevice.h
+  TYPE AudioToFileDevice
+  INCLUDE AudioToFileDevice.h
+  GENERATE_PARSER
   EXTRA_CONFIG
     WRAPPER=AudioPlayerWrapper
   DEFAULT ON
@@ -15,8 +16,10 @@ if(NOT SKIP_audioToFileDevice)
 
   target_sources(yarp_audioToFileDevice
     PRIVATE
-      audioToFileDevice.cpp
-      audioToFileDevice.h
+      AudioToFileDevice.cpp
+      AudioToFileDevice.h
+      AudioToFileDevice_ParamsParser.cpp
+      AudioToFileDevice_ParamsParser.h
   )
 
   target_link_libraries(yarp_audioToFileDevice
@@ -43,4 +46,9 @@ if(NOT SKIP_audioToFileDevice)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_audioToFileDevice PROPERTY FOLDER "Plugins/Device")
+
+  if(YARP_COMPILE_TESTS)
+    add_subdirectory(tests)
+  endif()
+
 endif()

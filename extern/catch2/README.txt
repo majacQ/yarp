@@ -8,11 +8,8 @@ may require additional headers.
 
 Homepage: https://github.com/catchorg/Catch2
 
-Copyright: 2010-2020 Two Blue Cubes Ltd
-           2012, 2015 Martin Moene
-           2017 Justin R. Wilson
-           Catch2 Authors
+Copyright: Catch2 Authors
 
 License: BSL-1.0
 
-Version: 2.13.4
+Version: 3.4.0 https://github.com/catchorg/Catch2/releases/tag/v3.4.0

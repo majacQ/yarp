@@ -18,40 +18,61 @@ YARP_LOG_COMPONENT(FRAMETRANSFORSTORAGE, "yarp.device.frameTransformStorage")
 }
 
 //------------------------------------------------------------------------------------------------------------------------------
-bool FrameTransformStorage::getInternalContainer(FrameTransformContainer*& container)
+yarp::dev::ReturnValue FrameTransformStorage::getInternalContainer(FrameTransformContainer*& container)
 {
     container = &m_tf_container;
-    return true;
+    return ReturnValue_ok;
 }
 
 bool FrameTransformStorage::open(yarp::os::Searchable& config)
 {
+    if (!this->parseParams(config)) { return false; }
+
+    std::string sstr = config.toString();
+
+    if (m_FrameTransform_verbose_debug)
+    {
+        m_tf_container.m_verbose_debug=true;
+        m_tf_container.m_name = this->id() + ".container";
+    }
+
+    //if (m_FrameTransform_container_timeout>0) //should I check?
+    {
+        m_tf_container.m_timeout = m_FrameTransform_container_timeout;
+    }
+
     yCTrace(FRAMETRANSFORSTORAGE);
-    return true;
+    bool b = this->start();
+    return b;
 }
 
 bool FrameTransformStorage::close()
 {
+    detach();
     return true;
 }
 
-bool FrameTransformStorage::getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const
+yarp::dev::ReturnValue FrameTransformStorage::getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const
 {
+    std::lock_guard <std::mutex> lg(m_pd_mutex);
     return m_tf_container.getTransforms(transforms);
 }
 
-bool FrameTransformStorage::setTransforms(const std::vector<yarp::math::FrameTransform>& transforms)
+yarp::dev::ReturnValue FrameTransformStorage::setTransforms(const std::vector<yarp::math::FrameTransform>& transforms)
 {
+    std::lock_guard <std::mutex> lg(m_pd_mutex);
     return m_tf_container.setTransforms(transforms);
 }
 
-bool FrameTransformStorage::setTransform(const yarp::math::FrameTransform& t)
+yarp::dev::ReturnValue FrameTransformStorage::setTransform(const yarp::math::FrameTransform& t)
 {
+    std::lock_guard <std::mutex> lg(m_pd_mutex);
     return m_tf_container.setTransform (t);
 }
 
-bool FrameTransformStorage::deleteTransform(std::string t1, std::string t2)
+yarp::dev::ReturnValue FrameTransformStorage::deleteTransform(std::string t1, std::string t2)
 {
+    std::lock_guard <std::mutex> lg(m_pd_mutex);
     return m_tf_container.deleteTransform(t1,t2);
 }
 
@@ -63,10 +84,14 @@ void FrameTransformStorage::run()
     m_tf_container.checkAndRemoveExpired();
 
     // get new transforms
-    std::vector<yarp::math::FrameTransform> tfs;
-    bool b=iGetIf->getTransforms(tfs);
-    if (b) {
-        this->setTransforms(tfs);
+    if (iGetIf)
+    {
+        std::vector<yarp::math::FrameTransform> tfs;
+        bool b=iGetIf->getTransforms(tfs);
+        if (b)
+        {
+            m_tf_container.setTransforms(tfs);
+        }
     }
 }
 
@@ -88,9 +113,9 @@ bool FrameTransformStorage::attach(yarp::dev::PolyDriver* driver)
     if (driver->isValid())
     {
         pDriver = driver;
-        if (pDriver->view(iGetIf) && iGetIf!=nullptr)
+        pDriver->view(iGetIf);
+        if(iGetIf)
         {
-            start();
             return true;
         }
     }
@@ -98,12 +123,36 @@ bool FrameTransformStorage::attach(yarp::dev::PolyDriver* driver)
     return false;
 }
 
-bool FrameTransformStorage::clearAll()
+yarp::dev::ReturnValue FrameTransformStorage::clearAll()
 {
     return m_tf_container.clearAll();
 }
 
-bool FrameTransformStorage::size(size_t& size) const
+yarp::dev::ReturnValue FrameTransformStorage::size(size_t& size) const
 {
-    return m_tf_container.size(size);
+    if (m_tf_container.size(size))
+    {
+        return ReturnValue_ok;
+    }
+    return ReturnValue::return_code::return_value_error_method_failed;
+}
+
+yarp::dev::ReturnValue FrameTransformStorage::startStorageThread()
+{
+    if (this->start())
+    {
+        return ReturnValue_ok;
+    }
+    return ReturnValue::return_code::return_value_error_method_failed;
+}
+
+yarp::dev::ReturnValue FrameTransformStorage::stopStorageThread()
+{
+    this->askToStop();
+    do
+    {
+        yarp::os::Time::delay(0.001);
+    }
+    while (this->isRunning());
+    return ReturnValue_ok;
 }

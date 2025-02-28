@@ -16,7 +16,7 @@
 #include <yarp/os/ResourceFinder.h>
 #include <yarp/os/RpcServer.h>
 
-#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__) && !defined(__PPC__)
 #  include <csignal>
 #  include <cstring>
 #  include <execinfo.h>
@@ -28,7 +28,7 @@ public:
     Private(Module *parent);
     ~Private();
 
-#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__) && !defined(__PPC__)
     static struct sigaction old_action;
     static void sigsegv_handler(int nSignum, siginfo_t* si, void* vcontext);
 #endif
@@ -41,7 +41,7 @@ public:
     bool closeOk;
 };
 
-#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__) && !defined(__PPC__)
 struct sigaction yarprobotinterface::Module::Private::old_action;
 #endif
 
@@ -55,7 +55,7 @@ yarprobotinterface::Module::Private::Private(Module *parent) :
 
 yarprobotinterface::Module::Private::~Private() = default;
 
-#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__) && !defined(__PPC__)
 void yarprobotinterface::Module::Private::sigsegv_handler(int nSignum, siginfo_t* si, void* vcontext)
 {
     auto context = reinterpret_cast<ucontext_t*>(vcontext);
@@ -87,7 +87,7 @@ void yarprobotinterface::Module::Private::sigsegv_handler(int nSignum, siginfo_t
 yarprobotinterface::Module::Module() :
     mPriv(new Private(this))
 {
-#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__)
+#if defined(YARP_HAS_EXECINFO_H) && !defined(__APPLE__) && !defined(__arm__) && !defined(__aarch64__) && !defined(__PPC__)
     struct sigaction action;
     memset(&action, 0, sizeof(struct sigaction));
     memset(&Private::old_action, 0, sizeof(struct sigaction));
@@ -113,6 +113,8 @@ bool yarprobotinterface::Module::configure(yarp::os::ResourceFinder& rf)
 
     bool verbosity = rf.check("verbose");
     bool deprecated = rf.check("allow-deprecated-dtd");
+    bool dryrun = rf.check("dryrun");
+
     yarp::robotinterface::XMLReader reader;
     reader.setVerbose(verbosity);
     reader.setEnableDeprecated(deprecated);
@@ -140,8 +142,21 @@ bool yarprobotinterface::Module::configure(yarp::os::ResourceFinder& rf)
 
     mPriv->robot.setVerbose(verbosity);
     mPriv->robot.setAllowDeprecatedDevices(rf.check("allow-deprecated-devices"));
+    mPriv->robot.setDryRun(dryrun);
 
-    std::string rpcPortName("/" + getName() + "/yarprobotinterface");
+    std::string portprefix = mPriv->robot.portprefix();
+    if (portprefix[0] != '/') {
+        yWarning() <<
+            "*************************************************************************************\n"
+            "* yarprobotinterface 'portprefix' parameter does not follow convention,  *\n"
+            "* it MUST start with a leading '/' since it is used as the full prefix port name    *\n"
+            "*     name:    full port prefix name with leading '/',  e.g.  /robotName      *\n"
+            "* A temporary automatic fix will be done for you, but please fix your config file   *\n"
+            "*************************************************************************************";
+        portprefix = "/" + portprefix;
+    }
+
+    std::string rpcPortName(portprefix + "/yarprobotinterface");
     mPriv->rpcPort.open(rpcPortName);
     attach(mPriv->rpcPort);
 

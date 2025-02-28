@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2006-2010 RobotCub Consortium
 # SPDX-License-Identifier: BSD-3-Clause
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
 find_package(YARP COMPONENTS os dev REQUIRED)
 
 # Declare a device called "fake_grabber", with C++ type
@@ -14,7 +14,7 @@ yarp_prepare_plugin(fake_grabber
   CATEGORY device
   TYPE FakeFrameGrabber
   INCLUDE FakeFrameGrabber.h
-  EXTRA_CONFIG WRAPPER=grabberDual
+  EXTRA_CONFIG WRAPPER=frameGrabber_nws_yarp
 )
 
 if(NOT SKIP_fake_grabber)

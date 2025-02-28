@@ -8,6 +8,7 @@
 #include <yarp/os/Log.h>
 #include <yarp/os/LogComponent.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/os/ResourceFinder.h>
 
 #include <yarp/math/Math.h>
 
@@ -67,14 +68,22 @@ bool FrameTransformServer::open(yarp::os::Searchable &config)
 {
     yCWarning(FRAMETRANSFORMSERVER) << "The 'FrameTransformServer' device is experimental and could be modified without any warning";
 
+    if (!this->parseParams(config)) { return false; }
+
+    std::string cfg_string = config.toString();
     yarp::os::Property cfg;
-    cfg.fromString(config.toString());
+    cfg.fromString(cfg_string);
 
     std::string configuration_to_open;
     std::string innerFilePath="config_xml/fts_yarp_only.xml";
-    if(cfg.check("testxml_option"))
+    if(!m_testxml_from.empty())
     {
-        innerFilePath = cfg.find("testxml_option").asString();
+        yarp::os::ResourceFinder findXml;
+        if(!m_testxml_context.empty())
+        {
+            findXml.setDefaultContext(m_testxml_context);
+        }
+        innerFilePath = findXml.findFileByName(m_testxml_from);
         std::ifstream xmlFile(innerFilePath);
         std::stringstream stream_file;
         stream_file << xmlFile.rdbuf();
@@ -83,7 +92,7 @@ bool FrameTransformServer::open(yarp::os::Searchable &config)
     else
     {
         auto fs = cmrc::frameTransformServerRC::get_filesystem();
-        if(cfg.check("filexml_option")) { innerFilePath="config_xml/"+cfg.find("filexml_option").toString();}
+        if(!m_filexml_option.empty()) { innerFilePath="config_xml/"+ m_filexml_option;}
         cfg.unput("filexml_option");
         auto xmlFile = fs.open(innerFilePath);
         for(const auto& lemma : xmlFile)
@@ -92,13 +101,21 @@ bool FrameTransformServer::open(yarp::os::Searchable &config)
         }
     }
 
-    std::string m_local_rpcUser = "/ftServer/rpc";
-    if (cfg.check("local_rpc")) { m_local_rpcUser=cfg.find("local_rpc").toString();}
     cfg.unput("local_rpc");
+
+    if (m_FrameTransform_verbose_debug)
+    {
+       yarp::os::Value vval (true);
+       cfg.put("FrameTransform_verbose_debug", vval);
+    }
 
     yarp::robotinterface::XMLReader reader;
     yarp::robotinterface::XMLReaderResult result = reader.getRobotFromString(configuration_to_open, cfg);
-    yCAssert(FRAMETRANSFORMSERVER, result.parsingIsSuccessful);
+    if (result.parsingIsSuccessful == false)
+    {
+        yCError(FRAMETRANSFORMSERVER) << "Unable to parse configuration";
+        return false;
+    }
 
     m_robot = std::move(result.robot);
 
@@ -110,7 +127,7 @@ bool FrameTransformServer::open(yarp::os::Searchable &config)
         return false;
     }
 
-    if (!m_rpc_InterfaceToUser.open(m_local_rpcUser))
+    if (!m_rpc_InterfaceToUser.open(m_local_rpc))
     {
         yCError(FRAMETRANSFORMSERVER,"Failed to open rpc port");
     }
@@ -122,14 +139,17 @@ bool FrameTransformServer::open(yarp::os::Searchable &config)
 
 bool FrameTransformServer::close()
 {
+    this->askToStop();
+    m_rpc_InterfaceToUser.close();
+    yCDebug(FRAMETRANSFORMSERVER, "rpc port closed");
+
     m_robot.enterPhase(yarp::robotinterface::ActionPhaseInterrupt1);
     m_robot.enterPhase(yarp::robotinterface::ActionPhaseShutdown);
-    m_rpc_InterfaceToUser.close();
+
     return true;
 }
 
-FrameTransformServer::FrameTransformServer() : PeriodicThread(0.01),
-    m_period(0.01)
+FrameTransformServer::FrameTransformServer() : PeriodicThread(0.01)
 {
 }
 

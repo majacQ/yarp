@@ -116,6 +116,14 @@ public:
     Image& operator=(Image &&other) noexcept;
 
     /**
+     * Comparison operator.
+     * N.B. Comparing two images can be computationally intensive.
+     * This method is mainly used for CI purposes.
+     * @return true if the two images are identical
+     */
+    bool operator==(const Image& alt) const;
+
+    /**
      * Destructor.
      */
     ~Image() override;
@@ -292,43 +300,6 @@ public:
     */
     size_t getRawImageSize() const;
 
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.2.0
-    /**
-     * Returns IPL/OpenCV view of image, if possible.
-     * Not possible if the image is the wrong size, with no padding.
-     * This method is currently not well documented.
-     * @return pointer to an IplImage structure or nullptr
-     */
-    YARP_DEPRECATED_MSG("Use yarp::cv::toCvMat instead")
-    void *getIplImage();
-
-    /**
-     * Returns IPL/OpenCV view of image, if possible.
-     * Not possible if the image is the wrong size, with no padding.
-     * This method is currently not well documented.
-     * @return pointer to an IplImage structure or nullptr
-     */
-    YARP_DEPRECATED_MSG("Use yarp::cv::toCvMat instead")
-    const void *getIplImage() const;
-
-    /**
-     * Act as a wrapper around an IPL/OpenCV image.  The wrapped
-     * image needs to exist for the rest of the lifetime of
-     * this oboject.  Be careful if you use this method on objects
-     * read from or written to a BufferedPort, since the lifetime
-     * of such objects can be longer than you expect (see the
-     * documentation for yarp::os::BufferedPort::read,
-     * yarp::os::BufferedPort::prepare, and yarp::os::BufferedPort::write).
-     *
-     * @param iplImage pointer to an IplImage structure
-     */
-    YARP_DEPRECATED_MSG("Use yarp::cv::fromCvMat instead")
-    void wrapIplImage(void *iplImage);
-#endif // YARP_NO_DEPRECATED
-
-    //void wrapRawImage(void *buf, int imgWidth, int imgHeight);
-
-
     /**
      * Read image from a connection.
      * @return true iff image was read correctly
@@ -342,25 +313,6 @@ public:
     bool write(yarp::os::ConnectionWriter& connection) const override;
 
     void setQuantum(size_t imgQuantum);
-
-    /**
-     * @return true if image has origin at top left (default); in other
-     * words when the y index is low, we are near the top of the image.
-     */
-    bool topIsLowIndex() const {
-        return topIsLow;
-    }
-
-    /**
-     * control whether image has origin at top left (default) or bottom
-     * left.
-     *
-     * @param flag true if image has origin at top left (default),
-     * false if image has origin at bottom left.
-     *
-     */
-    void setTopIsLowIndex(bool flag);
-
 
     /**
      * Get an array of pointers to the rows of the image.

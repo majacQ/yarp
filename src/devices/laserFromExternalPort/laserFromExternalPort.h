@@ -13,7 +13,7 @@
 #include <yarp/os/Stamp.h>
 #include <yarp/dev/ControlBoardInterfaces.h>
 #include <yarp/dev/IRangefinder2D.h>
-#include <yarp/dev/LaserScan2D.h>
+#include <yarp/sig/LaserScan2D.h>
 #include <yarp/dev/Lidar2DDeviceBase.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/dev/IFrameTransform.h>
@@ -34,16 +34,16 @@ enum base_enum
 };
 
 class InputPortProcessor :
-    public yarp::os::BufferedPort<yarp::dev::LaserScan2D>
+        public yarp::os::BufferedPort<yarp::sig::LaserScan2D>
 {
     std::mutex             m_port_mutex;
-    yarp::dev::LaserScan2D m_lastScan;
+    yarp::sig::LaserScan2D m_lastScan;
     yarp::os::Stamp        m_lastStamp;
     bool                   m_contains_data;
 
 public:
     InputPortProcessor(const InputPortProcessor& alt) :
-            yarp::os::BufferedPort<yarp::dev::LaserScan2D>(),
+            yarp::os::BufferedPort<yarp::sig::LaserScan2D>(),
             m_lastScan(alt.m_lastScan),
             m_lastStamp(alt.m_lastStamp),
             m_contains_data(alt.m_contains_data)
@@ -51,16 +51,39 @@ public:
     }
 
     InputPortProcessor();
-    using yarp::os::BufferedPort<yarp::dev::LaserScan2D>::onRead;
-    void onRead(yarp::dev::LaserScan2D& v) override;
-    void getLast(yarp::dev::LaserScan2D& data, yarp::os::Stamp& stmp);
+    using yarp::os::BufferedPort<yarp::sig::LaserScan2D>::onRead;
+    void onRead(yarp::sig::LaserScan2D& v) override;
+    void getLast(yarp::sig::LaserScan2D& data, yarp::os::Stamp& stmp);
 };
 
 /**
  * @ingroup dev_impl_lidar
  *
  * \brief `laserFromExternalPort`: Documentation to be added
- */
+ *
+ * Configuration examples:
+ * yarpdev --device rangefinder2D_nws_yarp --subdevice laserFromExternalPort \
+ * --SENSOR::input_ports_name "(/port1 /port2)" \
+ * --TRANSFORM_CLIENT::local /LaserFromExternalPort/tfClient \
+ * --TRANSFORM_CLIENT::remote /transformServer \
+ * --TRANSFORMS::src_frames "(/frame1 /frame2)" \
+ * --TRANSFORMS::dst_frame /output_frame \
+ * --period 0.01 \
+ * --name /outlaser:o
+
+ * yarpdev --device rangefinder2D_nws_yarp --subdevice laserFromExternalPort \
+ * --SENSOR::min_angle 0 \
+ * --SENSOR::max_angle 360 \
+ * --SENSOR::resolution 0.5 \
+ * --SENSOR::input_ports_name "(/port1 /port2)" \
+ * --TRANSFORM_CLIENT::local /LaserFromExternalPort/tfClient \
+ * --TRANSFORM_CLIENT::remote /transformServer \
+ * --TRANSFORMS::src_frames "(/frame1 /frame2)" \
+ * --TRANSFORMS::dst_frame /output_frame \
+ * --period 0.01 \
+ * --name /outlaser:o
+*/
+
 class LaserFromExternalPort : public yarp::dev::Lidar2DDeviceBase,
                               public yarp::os::PeriodicThread,
                               public yarp::dev::DeviceDriver
@@ -70,7 +93,7 @@ protected:
     std::vector <std::string>       m_port_names;
     std::vector<InputPortProcessor> m_input_ports;
     std::vector <yarp::os::Stamp>        m_last_stamp;
-    std::vector <yarp::dev::LaserScan2D> m_last_scan_data;
+    std::vector<yarp::sig::LaserScan2D> m_last_scan_data;
     yarp::dev::PolyDriver                m_tc_driver;
     yarp::dev::IFrameTransform*          m_iTc = nullptr;
 
@@ -79,7 +102,7 @@ protected:
     yarp::sig::Vector                    m_empty_laser_data;
     base_enum                            m_base_type;
 
-    void calculate(yarp::dev::LaserScan2D scan, yarp::sig::Matrix m);
+    void calculate(yarp::sig::LaserScan2D scan, yarp::sig::Matrix m);
 
 public:
     LaserFromExternalPort(double period = 0.01) : Lidar2DDeviceBase(), PeriodicThread(period)
@@ -100,10 +123,10 @@ public:
 
 public:
     //IRangefinder2D interface
-    bool setDistanceRange        (double min, double max) override;
-    bool setScanLimits           (double min, double max) override;
-    bool setHorizontalResolution (double step) override;
-    bool setScanRate             (double rate) override;
+    yarp::dev::ReturnValue setDistanceRange        (double min, double max) override;
+    yarp::dev::ReturnValue setScanLimits           (double min, double max) override;
+    yarp::dev::ReturnValue setHorizontalResolution (double step) override;
+    yarp::dev::ReturnValue setScanRate             (double rate) override;
 
 public:
     //Lidar2DDeviceBase

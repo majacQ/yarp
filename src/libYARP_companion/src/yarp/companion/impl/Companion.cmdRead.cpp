@@ -8,6 +8,7 @@
 #include <yarp/companion/impl/BottleReader.h>
 #include <yarp/os/ContactStyle.h>
 #include <yarp/os/Network.h>
+#include <yarp/os/LogStream.h>
 
 #include <cstring>
 
@@ -28,12 +29,12 @@ using yarp::os::NetworkBase;
  * @param trim number of characters of the string that should be printed
  * @return 0 on success, non-zero on failure
  */
-int Companion::read(const char *name, const char *src, bool showEnvelope, int trim)
+int Companion::read(const char *name, const char *src, Companion::showEnvelopeEnum showEnvelope, bool justOnce, int trim)
 {
     Companion::installHandler();
     BottleReader reader;
     applyArgs(reader.core);
-    reader.open(name, showEnvelope, trim);
+    reader.open(name, showEnvelope, justOnce, trim);
     if (src != nullptr) {
         ContactStyle style;
         style.quiet = false;
@@ -51,17 +52,21 @@ int Companion::cmdRead(int argc, char *argv[])
 {
     if (argc<1) {
         yCError(COMPANION, "Usage:");
-        yCError(COMPANION, "  yarp read <port> [remote port] [envelope] [trim [length]]");
+        yCError(COMPANION, "  yarp read <port> [remote port] [envelope] [trim [length]] [once]");
         return 1;
     }
 
     const char *name = argv[0];
     const char *src = nullptr;
-    bool showEnvelope = false;
+    showEnvelopeEnum showEnvelope = showEnvelopeEnum::do_not_show;
     size_t trim = -1;
+    bool justOnce = false;
+    bool envelopeInline = true;
     while (argc>1) {
-        if (strcmp(argv[1], "envelope")==0) {
-            showEnvelope = true;
+        if (strcmp(argv[1], "envelope") == 0) {
+            showEnvelope = showEnvelopeEnum::show_inline;
+        } else if (strcmp(argv[1], "envelope2") == 0) {
+            showEnvelope = showEnvelopeEnum::show_two_lines;
         } else if (strcmp(argv[1], "trim") == 0) {
             argc--;
             argv++;
@@ -71,11 +76,23 @@ int Companion::cmdRead(int argc, char *argv[])
                 static constexpr int default_trim = 80;
                 trim = default_trim;
             }
-        } else {
+        }
+        else if (strcmp(argv[1], "once") == 0) {
+            justOnce = true;
+        }
+        else {
             src = argv[1];
         }
         argc--;
         argv++;
     }
-    return read(name, src, showEnvelope, trim);
+
+    //the following check prevents opening as local port a port which is already registered (and active) on the yarp nameserver
+    bool e = NetworkBase::exists(name, true);
+    if (e)
+    {
+        yCError(COMPANION) << "Port"<< name << "already exists! Do you mean yarp read ..."<< name <<"?";
+        return 1;
+    }
+    return read(name, src, showEnvelope, justOnce, trim);
 }

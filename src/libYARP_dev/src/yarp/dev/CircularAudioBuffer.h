@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2006-2021 Istituto Italiano di Tecnologia (IIT)
+ * SPDX-FileCopyrightText: 2023-2023 Istituto Italiano di Tecnologia (IIT)
  * SPDX-License-Identifier: BSD-3-Clause
  */
 
@@ -7,7 +7,7 @@
 #define YARP_DEV_CIRCULARAUDIOBUFFER_H
 
 #include <yarp/os/Log.h>
-#include <yarp/dev/AudioBufferSize.h>
+#include <yarp/sig/AudioBufferSize.h>
 #include <cstdio>
 #include <string>
 
@@ -20,15 +20,15 @@ template <typename SAMPLE>
 class CircularAudioBuffer
 {
     std::string name;
-    yarp::dev::AudioBufferSize maxsize;
+    yarp::sig::AudioBufferSize maxsize;
     size_t start;
     size_t end;
-    SAMPLE *elems;
+    SAMPLE *elems=nullptr;
 
     public:
     bool isFull()
     {
-        return (end + 1) % maxsize.size == start;
+        return (end + 1) % maxsize.getBufferElements() == start;
     }
 
     const SAMPLE* getRawData()
@@ -44,15 +44,15 @@ class CircularAudioBuffer
     void write(SAMPLE elem)
     {
         elems[end] = elem;
-        end = (end + 1) % maxsize.size;
+        end = (end + 1) % maxsize.getBufferElements();
         if (end == start)
         {
             printf ("ERROR: %s buffer overrun!\n", name.c_str());
-            start = (start + 1) % maxsize.size; // full, overwrite
+            start = (start + 1) % maxsize.getBufferElements(); // full, overwrite
         }
     }
 
-    AudioBufferSize size()
+    yarp::sig::AudioBufferSize size()
     {
         size_t i;
         if (end > start) {
@@ -60,9 +60,9 @@ class CircularAudioBuffer
         } else if (end == start) {
             i = 0;
         } else {
-            i = maxsize.size - start + end;
+            i = maxsize.getBufferElements() - start + end;
         }
-        return AudioBufferSize(i/maxsize.m_channels, maxsize.m_channels, sizeof(SAMPLE));
+        return yarp::sig::AudioBufferSize(i/maxsize.getChannels(), maxsize.getChannels(), sizeof(SAMPLE));
     }
 
     SAMPLE read()
@@ -72,11 +72,11 @@ class CircularAudioBuffer
             printf ("ERROR: %s buffer underrun!\n", name.c_str());
         }
         SAMPLE elem = elems[start];
-        start = (start + 1) % maxsize.size;
+        start = (start + 1) % maxsize.getBufferElements();
         return elem;
     }
 
-    yarp::dev::AudioBufferSize getMaxSize()
+    yarp::sig::AudioBufferSize getMaxSize()
     {
         return maxsize;
     }
@@ -87,26 +87,28 @@ class CircularAudioBuffer
         end   = 0;
     }
 
-    CircularAudioBuffer(std::string buffer_name, yarp::dev::AudioBufferSize bufferSize) :
+    CircularAudioBuffer(std::string buffer_name, yarp::sig::AudioBufferSize bufferSize) :
             name{buffer_name},
             maxsize{bufferSize},
             start{0},
             end{0},
-            elems{static_cast<SAMPLE*>(calloc(maxsize.size, sizeof(SAMPLE)))}
+            elems{static_cast<SAMPLE*>(calloc(maxsize.getBufferElements(), sizeof(SAMPLE)))}
     {
         static_assert (std::is_same<unsigned char, SAMPLE>::value ||
                        std::is_same<unsigned short int, SAMPLE>::value ||
                        std::is_same<unsigned int, SAMPLE>::value,
                         "CircularAudioBuffer can be specialized only as <unsigned char>, <unsigned short int>, <unsigned int>");
 
-        yAssert(bufferSize.m_depth == sizeof(SAMPLE));
-
-        maxsize.size += 1;
+        yAssert(bufferSize.getDepth() == sizeof(SAMPLE));
     }
 
     ~CircularAudioBuffer()
     {
-        free(elems);
+        if (elems)
+        {
+            free(elems);
+            elems =nullptr;
+        }
     }
 
 };

@@ -6,7 +6,7 @@ yarp_prepare_plugin(usbCamera
   TYPE USBCameraDriverRgb
   INCLUDE common/USBcamera.h
   EXTRA_CONFIG
-    WRAPPER=grabberDual
+    WRAPPER=frameGrabber_nws_yarp
   DEPENDS "UNIX;NOT APPLE;YARP_HAS_Libv4l2;YARP_HAS_Libv4lconvert;YARP_HAS_OpenCV"
 )
 
@@ -15,7 +15,7 @@ yarp_prepare_plugin(usbCameraRaw
   TYPE USBCameraDriverRaw
   INCLUDE common/USBcamera.h
   EXTRA_CONFIG
-    WRAPPER=grabberDual
+    WRAPPER=frameGrabber_nws_yarp
   DEPENDS "UNIX;NOT APPLE;YARP_HAS_Libv4l2;YARP_HAS_Libv4lconvert;YARP_HAS_OpenCV"
 )
 
@@ -53,7 +53,7 @@ if(ENABLE_usbCamera OR ENABLE_usbCameraRaw)
 #   list(APPEND YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS Libv4lconvert) (not using targets)
 
   target_include_directories(yarp_usbCamera SYSTEM PRIVATE ${OpenCV_INCLUDE_DIRS})
-  target_link_libraries(yarp_usbCamera PRIVATE ${OpenCV_LIBRARIES})
+  target_link_libraries(yarp_usbCamera PRIVATE ${OpenCV_LIBS})
 #   list(APPEND YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS OpenCV) (not using targets)
 
   yarp_install(

@@ -7,15 +7,17 @@ yarp_prepare_plugin(ffmpeg_grabber
   TYPE FfmpegGrabber
   INCLUDE FfmpegGrabber.h
   EXTRA_CONFIG
-    WRAPPER=grabberDual
-  DEPENDS "YARP_HAS_FFMPEG;FFMPEG_avformat_FOUND;FFMPEG_avdevice_FOUND;FFMPEG_swscale_FOUND"
+    WRAPPER=frameGrabber_nws_yarp
+  GENERATE_PARSER
+  DEPENDS "YARP_HAS_FFMPEG;FFMPEG_avcodec_FOUND;FFMPEG_avformat_FOUND;FFMPEG_avdevice_FOUND;FFMPEG_avutil_FOUND;FFMPEG_swscale_FOUND"
 )
 
 yarp_prepare_plugin(ffmpeg_writer
   CATEGORY device
   TYPE FfmpegWriter
   INCLUDE FfmpegWriter.h
-  DEPENDS "YARP_HAS_FFMPEG;FFMPEG_avformat_FOUND;FFMPEG_avdevice_FOUND;FFMPEG_swscale_FOUND"
+  GENERATE_PARSER
+  DEPENDS "YARP_HAS_FFMPEG;FFMPEG_avcodec_FOUND;FFMPEG_avformat_FOUND;FFMPEG_avdevice_FOUND;FFMPEG_avutil_FOUND;FFMPEG_swscale_FOUND"
 )
 
 if(NOT SKIP_ffmpeg_grabber OR NOT SKIP_ffmpeg_writer)
@@ -29,6 +31,10 @@ if(NOT SKIP_ffmpeg_grabber OR NOT SKIP_ffmpeg_writer)
       FfmpegWriter.h
       ffmpeg_api.h
       ffmpeg_api.cpp
+      FfmpegGrabber_ParamsParser.cpp
+      FfmpegGrabber_ParamsParser.h
+      FfmpegWriter_ParamsParser.cpp
+      FfmpegWriter_ParamsParser.h
   )
 
   target_link_libraries(yarp_ffmpeg
@@ -48,6 +54,7 @@ if(NOT SKIP_ffmpeg_grabber OR NOT SKIP_ffmpeg_writer)
       ${FFMPEG_avcodec_INCLUDE_DIRS}
       ${FFMPEG_avformat_INCLUDE_DIRS}
       ${FFMPEG_avdevice_INCLUDE_DIRS}
+      ${FFMPEG_avutil_INCLUDE_DIRS}
       ${FFMPEG_swscale_INCLUDE_DIRS}
   )
   target_link_libraries(yarp_ffmpeg
@@ -55,6 +62,7 @@ if(NOT SKIP_ffmpeg_grabber OR NOT SKIP_ffmpeg_writer)
       ${FFMPEG_avcodec_LIBRARIES}
       ${FFMPEG_avformat_LIBRARIES}
       ${FFMPEG_avdevice_LIBRARIES}
+      ${FFMPEG_avutil_LIBRARIES}
       ${FFMPEG_swscale_LIBRARIES}
   )
   # list(APPEND YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS FFMPEG) # Not using targets

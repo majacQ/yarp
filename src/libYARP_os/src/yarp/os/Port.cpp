@@ -98,6 +98,13 @@ bool Port::open(const Contact& contact, bool registerName, const char* fakeName)
     std::string n = contact2.getName();
 
     NameConfig conf;
+
+    std::string nportnumber = std::string("YARP_PORTNUMBER") + conf.getSafeString(n);
+    uint16_t port = yarp::conf::environment::get_numeric<uint16_t>(nportnumber);
+    if (port != 0) {
+        contact2.setPort(port);
+    }
+
     std::string nenv = std::string("YARP_RENAME") + conf.getSafeString(n);
     std::string rename = yarp::conf::environment::get_string(nenv);
     if (!rename.empty()) {
@@ -305,11 +312,11 @@ bool Port::open(const Contact& contact, bool registerName, const char* fakeName)
         }
 
         if (address.getRegName().empty()) {
-            yCInfo(PORT,
+            yCIInfo(PORT, core.getName(),
                    "Anonymous port active at %s",
                    address.toURI().c_str());
         } else {
-            yCInfo(PORT,
+            yCIInfo(PORT, core.getName(),
                    "Port %s active at %s",
                    address.getRegName().c_str(),
                    address.toURI().c_str());
@@ -322,7 +329,9 @@ bool Port::open(const Contact& contact, bool registerName, const char* fakeName)
     }
 
     if (!success) {
-        yCError(PORT, "Port %s failed to activate%s%s (%s)",
+        yCIError(PORT,
+                core.getName().c_str(),
+                "Port %s failed to activate%s%s (%s)",
                 (address.isValid() ? (address.getRegName().c_str()) : (contact2.getName().c_str())),
                 (address.isValid() ? " at " : ""),
                 (address.isValid() ? address.toURI().c_str() : ""),
@@ -673,16 +682,6 @@ bool Port::isOpen() const
     return IMPL().active;
 }
 
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.3
-YARP_WARNING_PUSH
-YARP_DISABLE_DEPRECATED_WARNING
-bool Port::setCallbackLock(yarp::os::Mutex* mutex)
-{
-    return IMPL().configCallbackLock(mutex);
-}
-YARP_WARNING_POP
-#endif
-
 bool Port::setCallbackLock(std::mutex* mutex)
 {
     return IMPL().configCallbackLock(mutex);
@@ -696,7 +695,10 @@ bool Port::removeCallbackLock()
 bool Port::lockCallback()
 {
     if (!IMPL().lockCallback()) {
-        yCError(PORT,"Cannot do lockCallback() without setCallbackLock() before opening port");
+        PortCoreAdapter& core = IMPL();
+        yCIError(PORT,
+                core.getName(),
+                "Cannot do lockCallback() without setCallbackLock() before opening port");
     }
     return true;
 }

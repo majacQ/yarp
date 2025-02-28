@@ -3,8 +3,9 @@
 
 yarp_prepare_plugin(audioFromFileDevice
   CATEGORY device
-  TYPE audioFromFileDevice
-  INCLUDE audioFromFileDevice.h
+  TYPE AudioFromFileDevice
+  INCLUDE AudioFromFileDevice.h
+  GENERATE_PARSER
   EXTRA_CONFIG
     WRAPPER=AudioRecorderWrapper
   DEFAULT ON
@@ -15,8 +16,10 @@ if(NOT SKIP_audioFromFileDevice)
 
   target_sources(yarp_audioFromFileDevice
     PRIVATE
-      audioFromFileDevice.cpp
-      audioFromFileDevice.h
+      AudioFromFileDevice.cpp
+      AudioFromFileDevice.h
+      AudioFromFileDevice_ParamsParser.cpp
+      AudioFromFileDevice_ParamsParser.h
   )
 
   target_link_libraries(yarp_audioFromFileDevice
@@ -43,4 +46,9 @@ if(NOT SKIP_audioFromFileDevice)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_audioFromFileDevice PROPERTY FOLDER "Plugins/Device")
+
+  if(YARP_COMPILE_TESTS)
+    add_subdirectory(tests)
+  endif()
+
 endif()

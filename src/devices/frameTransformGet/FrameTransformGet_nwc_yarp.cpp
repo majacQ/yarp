@@ -8,6 +8,8 @@
 #include <yarp/os/LogComponent.h>
 #include <yarp/os/LogStream.h>
 
+using namespace yarp::dev;
+
 YARP_LOG_COMPONENT(FRAMETRANSFORMGETNWCYARP, "yarp.devices.FrameTransformGet_nwc_yarp")
 
 
@@ -50,7 +52,7 @@ bool FrameTransformGet_nwc_yarp::open(yarp::os::Searchable& config)
         m_thrift_server_rpcPort_Name = prefix + "/thrift";
         yCWarning(FRAMETRANSFORMGETNWCYARP) << "no nws_thrift_port_prefix param found. The resulting port name will be: " << m_thrift_server_rpcPort_Name;
     }
-    // rpc inizialisation
+    // rpc initialization
     if(!m_thrift_rpcPort.open(m_thrift_rpcPort_Name))
     {
         yCError(FRAMETRANSFORMGETNWCYARP,"Could not open \"%s\" port",m_thrift_rpcPort_Name.c_str());
@@ -128,15 +130,20 @@ bool FrameTransformGet_nwc_yarp::close()
 {
     if (m_streaming_port_enabled)
     {
-        m_dataReader->interrupt();
         m_dataReader->close();
     }
     m_thrift_rpcPort.close();
+
+    if (m_dataReader)
+    {
+        delete m_dataReader;
+        m_dataReader = nullptr;
+    }
     return true;
 }
 
 
-bool FrameTransformGet_nwc_yarp::getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const
+ReturnValue FrameTransformGet_nwc_yarp::getTransforms(std::vector<yarp::math::FrameTransform>& transforms) const
 {
     if (!m_streaming_port_enabled)
     {
@@ -144,10 +151,10 @@ bool FrameTransformGet_nwc_yarp::getTransforms(std::vector<yarp::math::FrameTran
         if(!retrievedFromRPC.retvalue)
         {
             yCError(FRAMETRANSFORMGETNWCYARP, "Unable to get transformations");
-            return false;
+            return retrievedFromRPC.retvalue;
         }
         transforms = retrievedFromRPC.transforms_list;
-        return true;
+        return retrievedFromRPC.retvalue;
     }
     else
     {
@@ -156,10 +163,10 @@ bool FrameTransformGet_nwc_yarp::getTransforms(std::vector<yarp::math::FrameTran
             return_getAllTransforms retrievedFromSteaming;
             m_dataReader->getData(retrievedFromSteaming);
             transforms = retrievedFromSteaming.transforms_list;
-            return true;
+            return retrievedFromSteaming.retvalue;
         }
         yCError(FRAMETRANSFORMGETNWCYARP, "Unable to get transformations");
-        return false;
+        return yarp::dev::ReturnValue::return_code::return_value_error_generic;
     }
 }
 

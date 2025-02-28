@@ -4,19 +4,22 @@
 yarp_prepare_plugin(frameGrabberCropper
   CATEGORY device
   TYPE FrameGrabberCropper
-  INCLUDE frameGrabberCropper.h
+  INCLUDE FrameGrabberCropper.h
   EXTRA_CONFIG
-    WRAPPER=grabberDual
+    WRAPPER=frameGrabber_nws_yarp
   DEFAULT ON
+  GENERATE_PARSER
 )
 
-if(NOT SKIP_grabberDual)
+if(NOT SKIP_frameGrabberCropper)
   yarp_add_plugin(yarp_frameGrabberCropper)
 
   target_sources(yarp_frameGrabberCropper
     PRIVATE
-      frameGrabberCropper.cpp
-      frameGrabberCropper.h
+      FrameGrabberCropper.cpp
+      FrameGrabberCropper.h
+      FrameGrabberCropper_ParamsParser.cpp
+      FrameGrabberCropper_ParamsParser.h
   )
 
   target_link_libraries(yarp_frameGrabberCropper
@@ -43,4 +46,9 @@ if(NOT SKIP_grabberDual)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_frameGrabberCropper PROPERTY FOLDER "Plugins/Device")
+
+  if(YARP_COMPILE_TESTS)
+    add_subdirectory(tests)
+  endif()
+
 endif()

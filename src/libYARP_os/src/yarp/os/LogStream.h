@@ -19,7 +19,9 @@
 #include <iosfwd>
 #include <sstream>
 #include <string>
-#include <vector>
+#include <tuple>
+#include <type_traits>
+#include <utility>
 
 namespace yarp::os {
 
@@ -31,6 +33,7 @@ class YARP_os_API LogStream
                const char* fn,
                unsigned int l,
                const char* f,
+               const char* id,
                const double ct,
                const yarp::os::Log::Predicate pred,
                const LogComponent& c) :
@@ -38,6 +41,7 @@ class YARP_os_API LogStream
                 file(fn),
                 line(l),
                 func(f),
+                id(id),
                 systemtime(yarp::os::SystemClock::nowSystem()),
                 networktime(!yarp::os::Time::isClockInitialized() ? 0.0 : (yarp::os::Time::isSystemClock() ? systemtime : yarp::os::Time::now())),
                 externaltime(ct),
@@ -51,6 +55,7 @@ class YARP_os_API LogStream
         const char* file;
         unsigned int line;
         const char* func;
+        const char* id;
         double systemtime;
         double networktime;
         double externaltime;
@@ -65,10 +70,11 @@ public:
                      const char* file,
                      unsigned int line,
                      const char* func,
+                     const char* id,
                      const double externaltime,
                      const yarp::os::Log::Predicate pred = nullptr,
                      const LogComponent& comp = Log::defaultLogComponent()) :
-            stream(new Stream(type, file, line, func, externaltime, pred, comp))
+            stream(new Stream(type, file, line, func, id, externaltime, pred, comp))
     {
     }
 
@@ -83,7 +89,8 @@ public:
         if (!--stream->ref) {
             if (!stream->pred || stream->pred()) {
                 std::string s = stream->oss.str();
-                if (!s.empty()) {
+                if (!s.empty())
+                {
                     // remove the last character if it an empty space (i.e.
                     // always unless the user defined an operator<< that
                     // does not add an empty space.
@@ -94,7 +101,7 @@ public:
                             "' ' was expected. Some `operator<<` does not add an extra space at the end");
                     }
                     // remove the last character if it is a \n
-                    if (s.back() == '\n') {
+                    if (!s.empty() && s.back() == '\n') {
                         yarp::os::Log(stream->file, stream->line, stream->func, nullptr, yarp::os::Log::logInternalComponent()).warning(
                             "Removing extra \\n (stream-style)");
                         s.pop_back();
@@ -108,7 +115,8 @@ public:
                             stream->systemtime,
                             stream->networktime,
                             stream->externaltime,
-                            stream->comp);
+                            stream->comp,
+                            stream->id);
             }
 
             if (stream->type == yarp::os::Log::FatalType) {
@@ -242,18 +250,55 @@ public:
         return *this;
     }
 
-    template <typename T>
-    inline LogStream& operator<<(const std::vector<T>& t)
+#if !defined(SWIG)
+    template <typename T1, typename T2>
+    inline LogStream& operator<<(const std::pair<T1, T2>& t)
+    {
+        bool nospace = stream->nospace;
+        stream->nospace = true;
+        stream->oss << '{';
+        *this << t.first;
+        stream->oss << ", ";
+        *this << t.second << '}';
+        stream->nospace = nospace;
+        if (!stream->nospace) {
+            stream->oss << ' ';
+        }
+        return *this;
+    }
+
+    template <typename Container, typename = typename Container::value_type>
+    inline LogStream& operator<<(const Container& cont)
+    {
+        return streamInternal(cont);
+    }
+
+    template <typename Arr, typename std::enable_if_t<std::is_array_v<Arr>, bool> = true>
+    inline LogStream& operator<<(const Arr& arr)
+    {
+        return streamInternal(arr);
+    }
+
+    template <typename... Args>
+    inline LogStream& operator<<(const std::tuple<Args...>& t)
+    {
+        bool nospace = stream->nospace;
+        stream->nospace = true;
+        return tupleInternal<0>(t, nospace);
+    }
+
+private:
+    template <typename C>
+    inline LogStream& streamInternal(const C& c)
     {
         bool nospace = stream->nospace;
         stream->nospace = true;
         stream->oss << '[';
-        for (typename std::vector<T>::const_iterator it = t.begin(); it != t.end(); ++it) {
-            const T& p = *it;
-            if (it != t.begin()) {
+        for (auto it = std::begin(c); it != std::end(c); ++it) {
+            if (it != std::begin(c)) {
                 stream->oss << ", ";
             }
-            *this << p;
+            *this << *it;
         }
         stream->oss << ']';
         stream->nospace = nospace;
@@ -261,7 +306,30 @@ public:
             stream->oss << ' ';
         }
         return *this;
-}
+    }
+
+    template <std::size_t I, typename... Args>
+    inline LogStream& tupleInternal(const std::tuple<Args...>& t, bool nospace)
+    {
+        if constexpr (I == 0) {
+            stream->oss << '{';
+        }
+        if constexpr (I < sizeof...(Args)) {
+            if constexpr (I != 0) {
+                stream->oss << ", ";
+            }
+            *this << std::get<I>(t);
+            return tupleInternal<I + 1>(t, nospace);
+        } else {
+            stream->oss << '}';
+            stream->nospace = nospace;
+            if (!stream->nospace) {
+                stream->oss << ' ';
+            }
+        }
+        return *this;
+    }
+#endif // !defined(SWIG)
 
 }; // class LogStream
 

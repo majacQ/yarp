@@ -34,6 +34,12 @@ public:
 
     int dispatch(const char *name, int argc, char *argv[]);
 
+    enum showEnvelopeEnum
+    {
+        do_not_show = 0,
+        show_inline = 1,
+        show_two_lines = 2
+    };
 
     // Defined in Companion.cmdCheck.cpp
     int cmdCheck(int argc, char *argv[]);
@@ -102,7 +108,7 @@ public:
     int cmdPrioritySched(int argc, char *argv[]);
 
     // Defined in Companion.cmdRead.cpp
-    int read(const char *name, const char *src = nullptr, bool showEnvelope = false, int trim = -1);
+    int read(const char *name, const char *src = nullptr, showEnvelopeEnum showEnvelope = showEnvelopeEnum::do_not_show, bool justOnce = false, int trim = -1);
     int cmdRead(int argc, char *argv[]);
 
     // Defined in Companion.cmdReadWrite.cpp
@@ -128,6 +134,9 @@ public:
     // Defined in Companion.cmdStats.cpp
     int cmdStats(int argc, char* argv[]);
 
+    // Defined in Companion.cmdSplit.cpp
+    int cmdSplit(int argc, char* argv[]);
+
     // Defined in Companion.cmdTerminate.cpp
     int cmdTerminate(int argc, char *argv[]);
 
@@ -151,7 +160,7 @@ public:
     int cmdWhere(int argc, char *argv[]);
 
     // Defined in Companion.cmdWrite.cpp
-    int write(const char *name, int ntargets, char *targets[]);
+    int write(const char *name, int ntargets, char *targets[], double period = 0);
     int cmdWrite(int argc, char *argv[]);
 
     static yarp::os::Contactable* getActivePort() { return getInstance().active_port; }

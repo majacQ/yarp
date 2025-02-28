@@ -44,6 +44,7 @@
 
 %import <yarp/os/api.h>
 
+
 // YARP_sig
 %{
 #include <yarp/sig/api.h>
@@ -81,8 +82,9 @@
 %include <stdint.i>
 %include <std_vector.i>
 
-// Try to translate std::string to native equivalents
+// Try to translate std::string and std::pair to native equivalents
 %include "std_string.i"
+%include "std_pair.i"
 
 #if defined(SWIGCSHARP)
     // Get .NET pointers instead of swig generated types (useful when dealing with images)
@@ -206,7 +208,6 @@
 %ignore yarp::sig::Image::operator()(int,int) const;
 %ignore yarp::sig::Image::pixel(int,int) const;
 %ignore yarp::sig::Image::getRow(int) const;
-%ignore yarp::sig::Image::getIplImage() const;
 %ignore yarp::sig::Image::getReadType() const;
 %ignore yarp::sig::VectorOf<double>::getType() const;
 %ignore yarp::sig::VectorOf<double>::VectorOf(std::initializer_list<double>);
@@ -366,10 +367,7 @@ void setExternal2(yarp::sig::Image *img, PyObject* mem, int w, int h) {
 %include <yarp/os/LogStream.h>
 %include <yarp/os/Wire.h>
 %include <yarp/os/WireLink.h>
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-%include <yarp/os/RateThread.h>
-#endif
+%include <yarp/os/Type.h>
 
 %define MAKE_COMMS(name)
 %feature("notabstract") yarp::os::BufferedPort<name>;
@@ -393,7 +391,6 @@ MAKE_COMMS(Bottle)
 %include <yarp/sig/Sound.h>
 %include <yarp/sig/Matrix.h>
 %include <yarp/sig/Vector.h>
-%include <yarp/os/IConfig.h>
 %include <yarp/dev/DeviceDriver.h>
 %include <yarp/dev/PolyDriver.h>
 %include <yarp/dev/Drivers.h>
@@ -416,6 +413,7 @@ MAKE_COMMS(Bottle)
 %include <yarp/dev/ControlBoardPid.h>
 %include <yarp/dev/IControlMode.h>
 %include <yarp/dev/IInteractionMode.h>
+%include <yarp/dev/IJointFault.h>
 %include <yarp/dev/IEncodersTimed.h>
 %include <yarp/dev/IMotor.h>
 %include <yarp/dev/IMotorEncoders.h>
@@ -428,32 +426,29 @@ MAKE_COMMS(Bottle)
 %include <yarp/dev/IRemoteVariables.h>
 %include <yarp/dev/IPidControl.h>
 %include <yarp/dev/IPositionDirect.h>
+%include <yarp/dev/ISpeechSynthesizer.h>
+%include <yarp/dev/ISpeechTranscription.h>
+%include <yarp/dev/ILLM.h>
 %include <yarp/dev/MultipleAnalogSensorsInterfaces.h>
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-%include <yarp/dev/FrameGrabberControl2.h>
-%include <yarp/dev/IControlMode2.h>
-#endif
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.5.0
-%include <yarp/dev/IFrameGrabber.h>
-%include <yarp/dev/IFrameGrabberRgb.h>
-#endif YARP_NO_DEPRECATED // Since YARP 3.5.0
-
+#include <yarp/dev/IFrameTransform.h>
 
 %template(DVector) std::vector<double>;
 %template(BVector) std::vector<bool>;
 %template(SVector) std::vector<std::string>;
 %template(IVector) std::vector<int>;
 %template(ShortVector) std::vector<short int>;
+%template() std::pair<std::string, std::string>;
+%template(SPairVector) std::vector<std::pair<std::string, std::string>>;
 
 #ifdef SWIGMATLAB
   // Extend IVector for handling conversion of vectors from and to Matlab
   %include "matlab/vectors_fromTo_matlab.i"
 #endif
 
+#if SWIG_VERSION < 0x040201
 #if defined(SWIGCSHARP)
   SWIG_STD_VECTOR_SPECIALIZE_MINIMUM(Pid,yarp::dev::Pid)
+#endif
 #endif
 %template(PidVector) std::vector<yarp::dev::Pid>;
 
@@ -815,32 +810,19 @@ typedef yarp::os::BufferedPort<ImageRgbFloat> BufferedPortImageRgbFloat;
     CAST_POLYDRIVER_TO_INTERFACE(IImpedanceControl)
     CAST_POLYDRIVER_TO_INTERFACE(ITorqueControl)
     CAST_POLYDRIVER_TO_INTERFACE(IControlMode)
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-    yarp::dev::IControlMode *viewIControlMode2() {
-        yarp::dev::IControlMode *result;
-        self->view(result);
-        return result;
-    }
-#endif
-
+    CAST_POLYDRIVER_TO_INTERFACE(IJointFault)
     CAST_POLYDRIVER_TO_INTERFACE(IInteractionMode)
     CAST_POLYDRIVER_TO_INTERFACE(IPWMControl)
     CAST_POLYDRIVER_TO_INTERFACE(ICurrentControl)
     CAST_POLYDRIVER_TO_INTERFACE(IAnalogSensor)
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-    yarp::dev::IFrameGrabberControls *viewIFrameGrabberControls2() {
-        yarp::dev::IFrameGrabberControls *result;
-        self->view(result);
-        return result;
-    }
-#endif
-
     CAST_POLYDRIVER_TO_INTERFACE(IFrameGrabberControls)
     CAST_POLYDRIVER_TO_INTERFACE(IPositionDirect)
     CAST_POLYDRIVER_TO_INTERFACE(IRemoteVariables)
     CAST_POLYDRIVER_TO_INTERFACE(IAxisInfo)
+    CAST_POLYDRIVER_TO_INTERFACE(ISpeechSynthesizer)
+    CAST_POLYDRIVER_TO_INTERFACE(ISpeechTranscription)
+    CAST_POLYDRIVER_TO_INTERFACE(ILLM)
+    CAST_POLYDRIVER_TO_INTERFACE(IFrameTransform)
 
 // These views are currently disabled in SWIG + java generator since they are
 // useless without the EXTENDED_ANALOG_SENSOR_INTERFACE part.
@@ -1237,6 +1219,12 @@ typedef yarp::os::BufferedPort<ImageRgbFloat> BufferedPortImageRgbFloat;
     }
 }
 
+%extend yarp::dev::IJointFault {
+    bool getLastJointFault(int j, std::vector<int>& fault, std::vector<std::string>& message) {
+        return self->getLastJointFault(j, fault[0], message[0]);
+    }
+}
+
 %extend yarp::dev::IControlMode {
     int getControlMode(int j) {
         int buffer;
@@ -1560,6 +1548,67 @@ typedef yarp::os::BufferedPort<ImageRgbFloat> BufferedPortImageRgbFloat;
     }
 }
 
+%extend yarp::dev::ISpeechSynthesizer {
+    bool getLanguage(std::vector<string>& language) {
+        return self->getLanguage(language[0]);
+    }
+
+    bool getVoice(std::vector<string>& voice) {
+        return self->getVoice(voice[0]);
+    }
+
+    bool getSpeed(std::vector<double>& speed) {
+        return self->getSpeed(speed[0]);
+    }
+
+    bool getPitch(std::vector<double>& pitch) {
+        return self->getPitch(pitch[0]);
+    }
+}
+
+%extend yarp::dev::ISpeechTranscription {
+    bool getLanguage(std::vector<string>& language) {
+        return self->getLanguage(language[0]);
+    }
+
+    bool transcribe(const yarp::sig::Sound& sound, std::vector<string>& transcription, std::vector<double>& score) {
+        return self->transcribe(sound, transcription[0], score[0]);
+    }
+}
+
+%extend yarp::dev::ILLM {
+    bool readPrompt(std::vector<string>& oPropmt) {
+        return self->readPrompt(oPropmt[0]);
+    }
+
+    bool ask(const std::string& question, yarp::dev::LLM_Message& answer) {
+        return self->ask(question, answer);
+    }
+}
+
+%extend yarp::dev::IFrameTransform {
+    std::string allFramesAsString() {
+        std::string outputString;
+        bool ok = self->allFramesAsString(outputString);
+        if (!ok) return "";
+        return outputString;
+    }
+
+    std::vector<std::string> getAllFrameIds() {
+        std::vector<std::string> frameIds;
+        bool ok = self->getAllFrameIds(frameIds);
+        if (!ok) return std::vector<std::string>();
+        return frameIds;
+    }
+
+    std::string getParent(const std::string& frameId) {
+        std::string parent;
+        bool ok = self->getParent(frameId, parent);
+        if (!ok) return "unknown";
+        return parent;
+    }
+}
+
 // This is part is currently broken in SWIG + java generator since SWIG 3.0.3
 // (last swig version tested: 3.0.12)
 // See also https://github.com/robotology/yarp/issues/1770
@@ -1734,13 +1783,13 @@ typedef yarp::os::BufferedPort<ImageRgbFloat> BufferedPortImageRgbFloat;
     }
 
     double getNeckTrajTime() {
-              double result;
+        double result;
 
-              if(self->getNeckTrajTime(&result)) {
+        if(self->getNeckTrajTime(&result)) {
             return result;
         } else {
             return -1.0; //On error return -1.0
-          }
+        }
     }
 
     double getEyesTrajTime() {
@@ -1754,11 +1803,23 @@ typedef yarp::os::BufferedPort<ImageRgbFloat> BufferedPortImageRgbFloat;
     }
 
     bool checkMotionDone() {
-          bool flag;
+        bool flag;
+
         if(self->checkMotionDone(&flag)) {
             return flag;
         } else {
             return false;
+        }
+    }
+
+    int storeContext() {
+        int id;
+        int badContextId = -1000;
+
+        if(self->storeContext(&id)) {
+            return id;
+        } else {
+            return badContextId; //On error return the badContextId
         }
     }
 }
@@ -1963,3 +2024,13 @@ public:
         return result;
     }
 }
+
+//////////////////////////////////////////////////////////////////////////
+// Just in Python (and in yarp bindings itself, not in downstream bindings
+// that include yarp.i) add some code to automatically call
+// add_dll_directory as necessary
+// See https://github.com/robotology/robotology-superbuild/issues/1268
+// for more details
+#if defined(SWIGPYTHON) && defined(SWIG_GENERATING_YARP_BINDINGS)
+%include <swig_python_windows_preable.i>
+#endif

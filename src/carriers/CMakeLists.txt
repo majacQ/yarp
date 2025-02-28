@@ -13,15 +13,13 @@ yarp_begin_plugin_library(yarpcar
   add_subdirectory(shmem_carrier)
   add_subdirectory(human_carrier)
   add_subdirectory(mpi_carrier)
-  add_subdirectory(xmlrpc_carrier)
-  add_subdirectory(tcpros_carrier)
   add_subdirectory(mjpeg_carrier)
   add_subdirectory(bayer_carrier)
   add_subdirectory(priority_carrier)
   add_subdirectory(portmonitor_carrier)
-  add_subdirectory(h264_carrier)
   add_subdirectory(unix)
   add_subdirectory(websocket)
+  add_subdirectory(gstreamer_carrier)
 
 yarp_end_plugin_library(yarpcar QUIET)
 add_library(YARP::yarpcar ALIAS yarpcar)
@@ -41,7 +39,4 @@ yarp_install_basic_package_files(YARP_yarpcar
   PRIVATE_DEPENDENCIES ${YARP_yarpcar_PRIVATE_DEPS}
 )
 
-set_property(TARGET yarpcar PROPERTY FOLDER "Plugins/Carrier")
-
-include(YarpDeprecatedOption)
-yarp_renamed_option(CREATE_OPTIONAL_CARRIERS YARP_COMPILE_CARRIER_PLUGINS) # since YARP 3.0.0
+set_property(TARGET yarpcar PROPERTY FOLDER "Plugins")

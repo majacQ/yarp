@@ -286,8 +286,8 @@ set(RobotTestingFramework_REQUIRED_VERSION 2)
 find_package(RobotTestingFramework ${RobotTestingFramework_REQUIRED_VERSION} QUIET)
 checkandset_dependency(RobotTestingFramework)
 
-find_package(SQLite QUIET)
-checkbuildandset_dependency(SQLite)
+find_package(SQLite3 QUIET)
+checkbuildandset_dependency(SQLite3)
 
 find_package(Libedit QUIET)
 checkandset_dependency(Libedit)
@@ -414,10 +414,6 @@ checkandset_dependency(Libv4l2)
 find_package(Libv4lconvert QUIET)
 checkandset_dependency(Libv4lconvert)
 
-find_package(Fuse QUIET)
-checkandset_dependency(Fuse)
-
-
 ################################################################################
 # Options
 
@@ -482,14 +478,14 @@ endmacro()
 option(SKIP_ACE "Compile YARP without ACE (Linux only, limited functionality)" OFF)
 mark_as_advanced(SKIP_ACE)
 if(SKIP_ACE)
-  set_property(CACHE YARP_USE_ACE PROPERTY VALUE FALSE)
+  set(YARP_USE_ACE FALSE CACHE BOOL "Use ACE" FORCE)
   unset(YARP_HAS_ACE) # Not set = disabled
 elseif(YARP_HAS_SYSTEM_ACE)
-  set_property(CACHE YARP_USE_ACE PROPERTY VALUE TRUE)
+  set(YARP_USE_ACE TRUE  CACHE BOOL "Use ACE" FORCE)
   set(YARP_HAS_ACE TRUE)
   set(YARP_USE_SYSTEM_ACE TRUE)
 else()
-  set_property(CACHE YARP_USE_ACE PROPERTY VALUE FALSE)
+  set(YARP_USE_ACE FALSE CACHE BOOL "Use ACE" FORCE)
   set(YARP_HAS_ACE FALSE)
 endif()
 set_property(CACHE YARP_USE_ACE PROPERTY TYPE INTERNAL)
@@ -500,6 +496,10 @@ yarp_dependent_option(
   YARP_HAS_Eigen3 OFF
 )
 yarp_renamed_option(CREATE_LIB_MATH YARP_COMPILE_libYARP_math) # Deprecated since YARP 3.2
+
+if(NOT YARP_COMPILE_libYARP_math)
+  add_definitions(-DYARP_NO_MATH)
+endif()
 
 yarp_dependent_option(
   YARP_COMPILE_libYARP_robotinterface "Do you want to compile the library YARP_robotinterface?" ON
@@ -522,6 +522,10 @@ yarp_dependent_option(
 )
 yarp_dependent_option(
   YARP_COMPILE_yarpdatadumper "Do you want to compile yarpdatadumper?" ON
+  "YARP_COMPILE_EXECUTABLES" OFF
+)
+yarp_dependent_option(
+  YARP_COMPILE_yarpActionsPlayer "Do you want to compile yarpActionsPlayer?" ON
   "YARP_COMPILE_EXECUTABLES" OFF
 )
 yarp_dependent_option(
@@ -553,37 +557,37 @@ yarp_dependent_option(
   "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5" OFF
 )
 yarp_dependent_option(
+  YARP_COMPILE_yarpaudiocontrolgui "Do you want to compile yarpaudiocontrolgui?" ON
+  "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5" OFF
+)
+yarp_dependent_option(
   YARP_COMPILE_yarpmobilebasegui "Do you want to compile yarpmobilebasegui?" ON
   "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5" OFF
 )
 yarp_dependent_option(
   YARP_COMPILE_yarplaserscannergui  "Do you want to compile yarplaserscannergui?" ON
-  "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5;YARP_HAS_OpenCV" OFF
+  "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_OpenCV" OFF
+)
+yarp_dependent_option(
+  YARP_COMPILE_yarpopencvdisplay  "Do you want to compile yarpopencvdisplay?" ON
+  "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_OpenCV" OFF
 )
 yarp_dependent_option(
   YARP_COMPILE_yarpviz "Do you want to compile yarpviz?" ON
   "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5;YARP_HAS_Graphviz;YARP_HAS_QGVCore" OFF
 )
-
+yarp_dependent_option(
+  YARP_COMPILE_yarpconnectionsinfo "Do you want to compile yarpconnectionsinfo?" ON
+  "YARP_COMPILE_EXECUTABLES" OFF
+)
 yarp_dependent_option(
   YARP_COMPILE_RobotTestingFramework_ADDONS "Compile Robot Testing Framework addons." ON
   "YARP_HAS_RobotTestingFramework" OFF
 )
-
-yarp_renamed_option(CREATE_YARPROBOTINTERFACE YARP_COMPILE_yarprobotinterface) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPMANAGER_CONSOLE YARP_COMPILE_yarpmanager-console) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPDATADUMPER YARP_COMPILE_yarpdatadumper) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPVIEW YARP_COMPILE_yarpview) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPMANAGER YARP_COMPILE_yarpmanager) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPLOGGER YARP_COMPILE_yarplogger) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPSCOPE YARP_COMPILE_yarpscope) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPDATAPLAYER YARP_COMPILE_yarpdataplayer) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPMOTORGUI YARP_COMPILE_yarpmotorgui) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPLASERSCANNERGUI YARP_COMPILE_yarplaserscannergui) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPBATTERYGUI YARP_COMPILE_yarpbatterygui) # Deprecated since YARP 3.2
-yarp_renamed_option(CREATE_YARPVIZ YARP_COMPILE_yarpviz) # Deprecated since YARP 3.2
-yarp_renamed_option(YARP_COMPILE_RTF_ADDONS YARP_COMPILE_RobotTestingFramework_ADDONS) # Deprecated since YARP 3.2
-
+yarp_dependent_option(
+  YARP_COMPILE_yarpllmgui "Do you want to compile yarpllmgui" ON
+  "YARP_COMPILE_EXECUTABLES;YARP_COMPILE_GUIS;YARP_HAS_Qt5" OFF
+)
 
 ################################################################################
 # Disable some parts if they are not required
@@ -594,7 +598,7 @@ if(YARP_COMPILE_yarpmanager-console OR YARP_COMPILE_yarpmanager OR YARP_COMPILE_
 endif()
 
 set(YARP_COMPILE_libYARP_profiler OFF)
-if(YARP_COMPILE_yarpviz OR YARP_COMPILE_yarpmanager)
+if(YARP_COMPILE_yarpviz OR YARP_COMPILE_yarpmanager OR YARP_COMPILE_yarpconnectionsinfo)
   set(YARP_COMPILE_libYARP_profiler ON)
 endif()
 
@@ -629,7 +633,7 @@ message(STATUS "Libraries found:")
 print_dependency(YCM)
 print_dependency(ACE)
 print_dependency(RobotTestingFramework)
-print_dependency(SQLite)
+print_dependency(SQLite3)
 print_dependency(Eigen3)
 print_dependency(TinyXML)
 print_dependency(xmlrpcpp)
@@ -663,7 +667,6 @@ print_dependency(FLEX)
 print_dependency(I2C)
 print_dependency(Libv4l2)
 print_dependency(Libv4lconvert)
-print_dependency(Fuse)
 print_dependency(ZLIB)
 print_dependency(SOXR)
 
@@ -683,6 +686,7 @@ yarp_print_feature(YARP_COMPILE_EXECUTABLES 0 "Compile executables")
 yarp_print_feature(YARP_COMPILE_yarprobotinterface 1 "Compile yarprobotinterface${YARP_COMPILE_yarprobotinterface_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarpmanager-console 1 "Compile YARP Module Manager (console)${YARP_COMPILE_yarpmanager-console_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarpdatadumper 1 "Compile yarpdatadumper${YARP_COMPILE_yarpdatadumper_disable_reason}")
+yarp_print_feature(YARP_COMPILE_yarpActionsPlayer 1 "Compile yarpActionsPlayer${YARP_COMPILE_yarpActionsPlayer_disable_reason}")
 yarp_print_feature("YARP_COMPILE_yarpdatadumper AND YARP_HAS_OpenCV" 2 "yarpdatadumper video support")
 yarp_print_feature(YARP_COMPILE_GUIS 1 "Compile GUIs${YARP_COMPILE_GUIS_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarpview 2 "Compile yarpview${YARP_COMPILE_yarpview_disable_reason}")
@@ -693,6 +697,7 @@ yarp_print_feature(YARP_COMPILE_yarpdataplayer 2 "Compile yarpdataplayer${YARP_C
 yarp_print_feature("YARP_COMPILE_yarpdataplayer AND YARP_HAS_OpenCV" 3 "yarpdataplayer video support")
 yarp_print_feature(YARP_COMPILE_yarpmotorgui 2 "Compile yarpmotorgui${YARP_COMPILE_yarpmotorgui_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarplaserscannergui 2 "Compile yarplaserscannergui${YARP_COMPILE_yarplaserscannergui_disable_reason}")
+yarp_print_feature(YARP_COMPILE_yarpopencvdisplay 2 "Compile yarpopencvdisplay${YARP_COMPILE_yarpopencvdisplay_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarpbatterygui 2 "Compile yarpbatterygui${YARP_COMPILE_yarpbatterygui_disable_reason}")
 yarp_print_feature(YARP_COMPILE_yarpviz 2 "Compile yarpviz${YARP_COMPILE_yarpviz_disable_reason}")
 
@@ -703,6 +708,7 @@ yarp_print_feature(YARP_COMPILE_EXAMPLES 0 "Compile YARP examples")
 
 yarp_print_feature(YARP_COMPILE_TESTS 0 "Compile and enable YARP tests")
 yarp_print_feature(YARP_DISABLE_FAILING_TESTS 1 "Disable tests that fail randomly due to race conditions")
+yarp_print_feature(YARP_DISABLE_FAILING_VALGRIND_TESTS 1 "Disable tests on which valgrind detects issues")
 yarp_print_feature(YARP_ENABLE_BROKEN_TESTS 1 "Enable broken tests")
 yarp_print_feature(YARP_ENABLE_INTEGRATION_TESTS 1 "Run integration tests")
 yarp_print_feature(YARP_ENABLE_EXAMPLES_AS_TESTS 1 "Compile examples as unit tests")
@@ -714,6 +720,6 @@ yarp_print_feature(YARP_VALGRIND_TESTS 1 "Run YARP tests under Valgrind")
 
 check_skip_dependency(SKIP_ACE ACE)
 check_required_dependency(hmac)
-check_required_dependency(SQLite)
+check_required_dependency(SQLite3)
 check_optional_dependency(YARP_COMPILE_BINDINGS SWIG)
 check_optional_dependency(YARP_COMPILE_RobotTestingFramework_ADDONS RobotTestingFramework)

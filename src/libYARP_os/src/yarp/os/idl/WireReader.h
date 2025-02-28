@@ -116,6 +116,8 @@ public:
 
     bool readString(std::string& str, bool* is_vocab = nullptr);
 
+    bool readBlock(char* const data, size_t len);
+
     bool readBinary(std::string& str);
 
     template <typename EnumBase, typename ConverterType>
@@ -187,13 +189,13 @@ public:
 
     bool isError();
 
-    std::string readTag();
+    std::string readTag(size_t len = static_cast<size_t>(-1));
 
-    void readListBegin(yarp::os::idl::WireState& nstate, std::uint32_t& len);
+    void readListBegin(yarp::os::idl::WireState& nstate, size_t& len);
 
-    void readSetBegin(yarp::os::idl::WireState& nstate, std::uint32_t& len);
+    void readSetBegin(yarp::os::idl::WireState& nstate, size_t& len);
 
-    void readMapBegin(yarp::os::idl::WireState& nstate, yarp::os::idl::WireState& nstate2, std::uint32_t& len);
+    void readMapBegin(yarp::os::idl::WireState& nstate, yarp::os::idl::WireState& nstate2, size_t& len);
 
     void readListEnd();
 
@@ -206,49 +208,8 @@ public:
     bool getMode() const;
 
     bool getIsVocab32() const;
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-    YARP_DEPRECATED_MSG("Use getIsVocab instead")
-    bool getIsVocab() const {
-        return getIsVocab32();
-    }
-#endif // YARP_NO_DEPRECATED
 
     const std::string& getString() const;
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-    YARP_DEPRECATED_MSG("Use readI8 instead")
-    bool readByte(std::int8_t& x)
-    {
-        return readI8(x);
-    }
-
-    YARP_DEPRECATED_MSG("Use readFloat64 instead")
-    bool readDouble(double& x)
-    {
-        return readFloat64(x);
-    }
-#endif // YARP_NO_DEPRECATED
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.5.0
-    YARP_DEPRECATED_MSG("Use readVocab32 instead")
-    bool readVocab(std::int32_t& x) {
-        return readVocab32(x);
-    }
-#endif // YARP_NO_DEPRECATED
-
-#ifndef YARP_NO_DEPRECATED // Since YARP 3.0.0
-    YARP_DEPRECATED_MSG("Use expectInt32 instead")
-    int expectInt()
-    {
-        return static_cast<int>(expectInt32());
-    }
-
-    YARP_DEPRECATED_MSG("Use expectFloat64 instead")
-    double expectDouble()
-    {
-        return static_cast<double>(expectFloat64());
-    }
-#endif // YARP_NO_DEPRECATED
 
 private:
     NullConnectionWriter null_writer;

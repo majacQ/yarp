@@ -1,24 +1,20 @@
 # SPDX-FileCopyrightText: 2006-2021 Istituto Italiano di Tecnologia (IIT)
 # SPDX-License-Identifier: BSD-3-Clause
 
+# This test check if the yarp executable is working
+add_test(NAME misc::check_yarp_version COMMAND ${YARP_BINARY_DIR}/bin/yarp --version)
+set_property(TEST misc::check_yarp_version PROPERTY ENVIRONMENT "YARP_DATA_DIRS=${YARP_BINARY_DIR}/share/yarp")
+
+# This test check if all the plugins are working correctly (the test will fail if a single plugin cannot be opened)
+add_test(NAME misc::check_yarp_plugin COMMAND ${YARP_BINARY_DIR}/bin/yarp plugin --all)
+set_property(TEST misc::check_yarp_plugin PROPERTY ENVIRONMENT "YARP_DATA_DIRS=${YARP_BINARY_DIR}/share/yarp")
+
+# Similar to the previous test, but using yarpdev. Only device plugins are checked.
+add_test(NAME misc::check_yarpdev_list COMMAND ${YARP_BINARY_DIR}/bin/yarpdev --list)
+set_property(TEST misc::check_yarpdev_list PROPERTY ENVIRONMENT "YARP_DATA_DIRS=${YARP_BINARY_DIR}/share/yarp")
+
 if(NOT YARP_ENABLE_INTEGRATION_TESTS)
   return()
-endif()
-
-find_program(ROS_ROSCORE_EXECUTABLE NAMES roscore)
-mark_as_advanced(ROS_ROSCORE_EXECUTABLE)
-if(ROS_ROSCORE_EXECUTABLE)
-  # Pull in all ROS tests, and add each as an individual ctest test
-  set(test_family "integration::ros")
-  set(test_driver ${CMAKE_CURRENT_SOURCE_DIR}/ros/index.sh)
-  execute_process(COMMAND ${test_driver} OUTPUT_VARIABLE test_list OUTPUT_STRIP_TRAILING_WHITESPACE WORKING_DIRECTORY ${YARP_BINARY_DIR})
-  separate_arguments(test_list)
-  foreach(test ${test_list})
-    set(test_name "${test_family}::${test}")
-    add_test(${test_name} ${test_driver} ${test})
-    set_property(TEST ${test_name} PROPERTY ENVIRONMENT "YARP_DIR=${CMAKE_BINARY_DIR}")
-    set_property(TEST ${test_name} PROPERTY WORKING_DIRECTORY ${YARP_BINARY_DIR})
-  endforeach()
 endif()
 
 # Generate a matrix of SWIG tests

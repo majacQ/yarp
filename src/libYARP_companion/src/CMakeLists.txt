@@ -48,6 +48,7 @@ set(YARP_companion_IMPL_SRCS
   yarp/companion/impl/Companion.cmdRpc.cpp
   yarp/companion/impl/Companion.cmdRpcServer.cpp
   yarp/companion/impl/Companion.cmdSample.cpp
+  yarp/companion/impl/Companion.cmdSplit.cpp
   yarp/companion/impl/Companion.cmdStats.cpp
   yarp/companion/impl/Companion.cmdTerminate.cpp
   yarp/companion/impl/Companion.cmdTime.cpp
@@ -89,7 +90,7 @@ target_include_directories(YARP_companion
 )
 
 target_link_libraries(YARP_companion PUBLIC YARP::YARP_os)
-list(APPEND YARP_companion_PUBLIC_DEPS YARP_os)
+list(APPEND YARP_companion_PUBLIC_DEPS YARP_os )
 
 target_compile_features(YARP_companion PUBLIC cxx_std_17)
 

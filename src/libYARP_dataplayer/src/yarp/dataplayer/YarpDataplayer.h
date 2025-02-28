@@ -30,18 +30,12 @@
 #include <yarp/os/Log.h>
 #include <yarp/os/LogStream.h>
 
-#include <yarp/rosmsg/sensor_msgs/LaserScan.h>
-#include <yarp/rosmsg/nav_msgs/Odometry.h>
-#include <yarp/rosmsg/tf/tfMessage.h>
-#include <yarp/rosmsg/tf2_msgs/TFMessage.h>
-#include <yarp/rosmsg/geometry_msgs/Pose.h>
-#include <yarp/rosmsg/geometry_msgs/Pose2D.h>
-
 #include <list>
 #include <mutex>
 #include <vector>
 #include <string>
 #include <ctime>
+#include <chrono>
 
 namespace yarp::yarpDataplayer {
 class  DataplayerEngine;
@@ -265,7 +259,7 @@ protected:
     public:
         void SetDataplayerEngine(DataplayerEngine &dataplayerEngine)
         { this->dataplayerEngine = &dataplayerEngine; }
-        dataplayer_thread (double _period=0.002);
+        dataplayer_thread (double _period=0.0001);
 
         bool        threadInit() override;
         void        run() override;

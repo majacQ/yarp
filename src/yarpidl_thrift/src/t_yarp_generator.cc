@@ -40,7 +40,6 @@ class t_yarp_generator : public t_oop_generator
     bool use_include_prefix_{false};
     bool no_namespace_prefix_{true};
     bool no_copyright_{false};
-    bool no_editor_{false};
     bool no_doc_{false};
     bool debug_generator_{false};
 
@@ -65,7 +64,6 @@ public:
             use_include_prefix_{parsed_options.find("include_prefix") != parsed_options.end()},
             no_namespace_prefix_{parsed_options.find("no_namespace_prefix") != parsed_options.end()},
             no_copyright_{parsed_options.find("no_copyright") != parsed_options.end()},
-            no_editor_{parsed_options.find("no_editor") != parsed_options.end()},
             no_doc_{parsed_options.find("no_doc") != parsed_options.end()},
             debug_generator_{parsed_options.find("debug_generator") != parsed_options.end()}
     {
@@ -120,6 +118,11 @@ public:
     std::string inline_return_impl(const indent_t& indent_fn, const std::string& val = "") const
     {
         std::string str = " {\n";
+        if (debug_generator_) {
+            str += indent_fn();
+            str += indent_str();
+            str += "yWarning(\"%s:%d - %s\", __FILE__, __LINE__, __YFUNCTION__);\n";
+        }
         str += indent_fn();
         str += indent_str();
         str += "return";
@@ -214,7 +217,8 @@ public:
                                   t_field* tfield,
                                   const std::string& prefix = "",
                                   const std::string& suffix = "",
-                                  bool force_nested = false);
+                                  bool force_nested = false,
+                                  bool skip_tag = false);
 
     void generate_serialize_struct(std::ostringstream& out,
                                    t_field* tfield,
@@ -236,7 +240,8 @@ public:
 
     void generate_serialize_list_element(std::ostringstream& out,
                                          t_list* tlist,
-                                         const std::string& item_name);
+                                         const std::string& item_name,
+                                         bool skip_tag);
 
     void generate_function_call(std::ostream& out,
                                 t_function* tfunction,
@@ -281,6 +286,7 @@ public:
 
     std::string type_to_enum(t_type* ttype);
     std::string enum_base_to_id(const std::string& enum_base);
+    std::string enum_base_to_tag(const std::string& enum_base);
 
     std::string get_struct_name(t_struct* tstruct);
     std::string get_enum_base(t_enum* tenum);
@@ -373,6 +379,10 @@ public:
     void generate_service_method(t_service* tservice, t_function* function, std::ostringstream&  f_h_, std::ostringstream& f_cpp_);
     void generate_service_help(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
     void generate_service_read(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
+    void generate_service_monitor(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
+    void generate_service_monitor_create(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
+    void generate_service_monitor_update(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
+    void generate_service_monitor_updatereply(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_);
 
     void generate_xception(t_struct* txception) override;
 };
@@ -388,7 +398,11 @@ std::string t_yarp_generator::type_to_enum(t_type* type)
         case t_base_type::TYPE_VOID:
             throw "NO T_VOID CONSTRUCT";
         case t_base_type::TYPE_STRING:
-            return "BOTTLE_TAG_STRING";
+            if (static_cast<t_base_type*>(type)->is_binary()) {
+                return "BOTTLE_TAG_BLOB";
+            } else {
+                return "BOTTLE_TAG_STRING";
+            }
         case t_base_type::TYPE_BOOL:
             return "BOTTLE_TAG_VOCAB32";
         case t_base_type::TYPE_I8:
@@ -415,12 +429,15 @@ std::string t_yarp_generator::type_to_enum(t_type* type)
         }
         }
     } else if (type->is_enum()) {
-        return "BOTTLE_TAG_INT32";
-    } else if (type->is_struct() ||
-               type->is_map() ||
-               type->is_set() ||
-               type->is_list()) {
+        return enum_base_to_tag(get_enum_base(static_cast<t_enum*>(type)));
+    } else if (type->is_struct()) {
         return "BOTTLE_TAG_LIST";
+    } else if (type->is_map()) {
+        return "BOTTLE_TAG_LIST";
+    } else if (type->is_set()) {
+        return "BOTTLE_TAG_LIST | " + type_to_enum(static_cast<t_set*>(type)->get_elem_type());
+    } else if (type->is_list()) {
+        return "BOTTLE_TAG_LIST | " + type_to_enum(static_cast<t_list*>(type)->get_elem_type());
     } else if (type->is_xception()) {
         return "::apache::thrift::protocol::T_STRUCT";
     }
@@ -473,6 +490,43 @@ std::string t_yarp_generator::enum_base_to_id(const std::string& enum_base)
 
     printf("DO NOT KNOW HOW TO SERIALIZE ENUM WITH BASE '%s'\n", enum_base.c_str());
     return {"I32"};
+}
+
+std::string t_yarp_generator::enum_base_to_tag(const std::string& enum_base)
+{
+    if (enum_base == "std::uint8_t" ||
+        enum_base == "uint8_t" ||
+        enum_base == "unsigned char" ||
+        enum_base == "std::int8_t" ||
+        enum_base == "int8_t" ||
+        enum_base == "char") {
+        return {"BOTTLE_TAG_INT8"};
+    }
+    if (enum_base == "std::uint16_t" ||
+        enum_base == "uint16_t" ||
+        enum_base == "std::int16_t" ||
+        enum_base == "int16_t") {
+        return {"BOTTLE_TAG_INT16"};
+    }
+    if (enum_base == "std::uint32_t" ||
+        enum_base == "uint32_t" ||
+        enum_base == "std::int32_t" ||
+        enum_base == "int32_t" ||
+        enum_base == "int" ||
+        enum_base == "yarp::conf::vocab32_t" ||
+        enum_base == "vocab32_t") {
+        return {"BOTTLE_TAG_INT32"};
+    }
+    if (enum_base == "std::uint64_t" ||
+        enum_base == "uint64_t" ||
+        enum_base == "unsigned int" ||
+        enum_base == "std::int64_t" ||
+        enum_base == "int64_t") {
+        return {"BOTTLE_TAG_INT64"};
+    }
+
+    printf("DO NOT KNOW HOW TO SERIALIZE ENUM WITH BASE '%s'\n", enum_base.c_str());
+    return {"BOTTLE_TAG_INT32"};
 }
 
 std::string t_yarp_generator::get_struct_name(t_struct* tstruct)
@@ -1077,7 +1131,8 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
                                                 t_field* tfield,
                                                 const std::string& prefix,
                                                 const std::string& suffix,
-                                                bool force_nested)
+                                                bool force_nested,
+                                                bool skip_tag)
 {
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
@@ -1108,13 +1163,13 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
                 break;
             case t_base_type::TYPE_STRING:
                 if (static_cast<t_base_type*>(type)->is_binary()) {
-                    f_cpp_ << "writeBinary(" << name << ")";
+                    f_cpp_ << "writeBinary(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeString(" << name << ")";
+                    f_cpp_ << "writeString(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
             case t_base_type::TYPE_BOOL:
-                f_cpp_ << "writeBool(" << name << ")";
+                f_cpp_ << "writeBool(" << name << (skip_tag ? ", true" : "") << ")";
                 break;
             case t_base_type::TYPE_I8:
             {
@@ -1122,9 +1177,9 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
                 if (it != type->annotations_.end() && (it->second == "std::uint8_t" ||
                                                        it->second == "uint8_t" ||
                                                        it->second.find("unsigned") != std::string::npos)) {
-                    f_cpp_ << "writeUI8(" << name << ")";
+                    f_cpp_ << "writeUI8(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeI8(" << name << ")";
+                    f_cpp_ << "writeI8(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
             }
@@ -1134,9 +1189,9 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
                 if (it != type->annotations_.end() && (it->second == "std::uint16_t" ||
                                                        it->second == "uint16_t" ||
                                                        it->second.find("unsigned") != std::string::npos)) {
-                    f_cpp_ << "writeUI16(" << name << ")";
+                    f_cpp_ << "writeUI16(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeI16(" << name << ")";
+                    f_cpp_ << "writeI16(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
             }
@@ -1144,16 +1199,16 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
             {
                 auto it = type->annotations_.find("yarp.type");
                 if (it != type->annotations_.end() && it->second == "yarp::conf::vocab32_t") {
-                    f_cpp_ << "writeVocab32(" << name << ")";
+                    f_cpp_ << "writeVocab32(" << name << (skip_tag ? ", true" : "") << ")";
                 } else if (it != type->annotations_.end() && (it->second == "std::size_t" ||
                                                               it->second == "size_t")) {
-                    f_cpp_ << "writeSizeT(" << name << ")";
+                    f_cpp_ << "writeSizeT(" << name << (skip_tag ? ", true" : "") << ")";
                 } else if (it != type->annotations_.end() && (it->second == "std::uint32_t" ||
                                                               it->second == "uint32_t" ||
                                                               it->second.find("unsigned") != std::string::npos)) {
-                    f_cpp_ << "writeUI32(" << name << ")";
+                    f_cpp_ << "writeUI32(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeI32(" << name << ")";
+                    f_cpp_ << "writeI32(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
             }
@@ -1163,9 +1218,9 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
                 if (it != type->annotations_.end() && (it->second == "std::uint64_t" ||
                                                        it->second == "uint64_t" ||
                                                        it->second.find("unsigned") != std::string::npos)) {
-                    f_cpp_ << "writeUI64(" << name << ")";
+                    f_cpp_ << "writeUI64(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeI64(" << name << ")";
+                    f_cpp_ << "writeI64(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
             }
@@ -1173,9 +1228,9 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
             {
                 auto it = type->annotations_.find("yarp.type");
                 if (it != type->annotations_.end() && it->second == "yarp::conf::float32_t") {
-                    f_cpp_ << "writeFloat32(" << name << ")";
+                    f_cpp_ << "writeFloat32(" << name << (skip_tag ? ", true" : "") << ")";
                 } else {
-                    f_cpp_ << "writeFloat64(" << name << ")";
+                    f_cpp_ << "writeFloat64(" << name << (skip_tag ? ", true" : "") << ")";
                 }
                 break;
                 }
@@ -1185,7 +1240,7 @@ void t_yarp_generator::generate_serialize_field(std::ostringstream& f_cpp_,
         } else if (type->is_enum()) {
             auto* tenum = static_cast<t_enum*>(type);
             const std::string enum_base = get_enum_base(tenum);
-            f_cpp_ << "write" << enum_base_to_id(enum_base) << "(static_cast<" << enum_base << ">(" << name << "))";
+            f_cpp_ << "write" << enum_base_to_id(enum_base) << "(static_cast<" << enum_base << ">(" << name << ")" << (skip_tag ? ", true" : "") << ")";
         }
         f_cpp_ << ")" << inline_return_cpp("false");
     } else {
@@ -1218,36 +1273,69 @@ void t_yarp_generator::generate_serialize_container(std::ostringstream& f_cpp_,
         f_cpp_ << indent_cpp() << "if (!writer.writeMapBegin("
                         << type_to_enum(static_cast<t_map*>(ttype)->get_key_type())
                         << ", "
-                        << type_to_enum(static_cast<t_map*>(ttype)->get_val_type());
+                        << type_to_enum(static_cast<t_map*>(ttype)->get_val_type())
+                        << ", "
+                        << name
+                        << ".size()))"
+                        << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "for (const auto& _item : " << name << ") {\n";
+        indent_up_cpp();
+        {
+            generate_serialize_map_element(f_cpp_, static_cast<t_map*>(ttype), "_item");
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+        f_cpp_ << indent_cpp() << "if (!writer.writeMapEnd())" << inline_return_cpp("false");
+
     } else if (ttype->is_set()) {
         f_cpp_ << indent_cpp() << "if (!writer.writeSetBegin("
-                        << type_to_enum(static_cast<t_set*>(ttype)->get_elem_type());
-    } else if (ttype->is_list()) {
-        f_cpp_ << indent_cpp() << "if (!writer.writeListBegin("
-                        << type_to_enum(static_cast<t_list*>(ttype)->get_elem_type());
-    }
-    f_cpp_ << ", " << "static_cast<uint32_t>(" << name << ".size())))" << inline_return_cpp("false");
-
-    std::string item = tmp("_item");
-    f_cpp_ << indent_cpp() << "for (const auto& " << item << " : " << name << ") {\n";
-    indent_up_cpp();
-    {
-        if (ttype->is_map()) {
-            generate_serialize_map_element(f_cpp_, static_cast<t_map*>(ttype), item);
-        } else if (ttype->is_set()) {
-            generate_serialize_set_element(f_cpp_, static_cast<t_set*>(ttype), item);
-        } else if (ttype->is_list()) {
-            generate_serialize_list_element(f_cpp_, static_cast<t_list*>(ttype), item);
+                        << type_to_enum(static_cast<t_set*>(ttype)->get_elem_type())
+                        << ", "
+                        << name
+                        << ".size()))"
+                        << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "for (const auto& _item : " << name << ") {\n";
+        indent_up_cpp();
+        {
+            generate_serialize_set_element(f_cpp_, static_cast<t_set*>(ttype), "_item");
         }
-    }
-    indent_down_cpp();
-    f_cpp_ << indent_cpp() << "}\n";
-
-    if (ttype->is_map()) {
-        f_cpp_ << indent_cpp() << "if (!writer.writeMapEnd())" << inline_return_cpp("false");
-    } else if (ttype->is_set()) {
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
         f_cpp_ << indent_cpp() << "if (!writer.writeSetEnd())" << inline_return_cpp("false");
+
     } else if (ttype->is_list()) {
+        auto* elem_type = static_cast<t_list*>(ttype)->get_elem_type();
+        f_cpp_ << indent_cpp() << "if (!writer.writeListBegin("
+                        << type_to_enum(elem_type)
+                        << ", "
+                        << name
+                        << ".size()))"
+                        << inline_return_cpp("false");
+        // Do not use block serialization for complex types and for vector<bool>
+        // that does not necessarily store its elements as a contiguous array.
+        if (!is_complex_type(elem_type) && (static_cast<t_base_type*>(elem_type)->get_base() != t_base_type::TYPE_BOOL)) {
+            // For simple types just push the whole data block
+            f_cpp_ << indent_cpp() << "if (!writer.writeBlock(reinterpret_cast<const char*>("
+                            << name
+                            << ".data()), "
+                            << name
+                            << ".size() * sizeof("
+                            << type_name(elem_type)
+                            << ")))"
+                            << inline_return_cpp("false");
+        } else {
+            // For complex types serialize data one by one
+            f_cpp_ << indent_cpp() << "for (const auto& _item : " << name << ") {\n";
+            indent_up_cpp();
+            {
+                // If the tag for this item type is already contained in the list
+                // tag, it should not be written for each element, therefore
+                // skip_tag is set to true.
+                generate_serialize_list_element(f_cpp_, static_cast<t_list*>(ttype), "_item", /* skip_type */ true);
+            }
+            indent_down_cpp();
+            f_cpp_ << indent_cpp() << "}\n";
+        }
         f_cpp_ << indent_cpp() << "if (!writer.writeListEnd())" << inline_return_cpp("false");
     }
 }
@@ -1281,12 +1369,13 @@ void t_yarp_generator::generate_serialize_set_element(std::ostringstream& f_cpp_
 
 void t_yarp_generator::generate_serialize_list_element(std::ostringstream& f_cpp_,
                                                        t_list* tlist,
-                                                       const std::string& item_name)
+                                                       const std::string& item_name,
+                                                       bool skip_tag)
 {
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
     t_field efield(tlist->get_elem_type(), item_name);
-    generate_serialize_field(f_cpp_, &efield, "", "", true);
+    generate_serialize_field(f_cpp_, &efield, "", "", true, skip_tag);
 }
 
 
@@ -1431,8 +1520,7 @@ void t_yarp_generator::generate_deserialize_field(std::ostringstream& f_cpp_,
     } else if (type->is_enum()) {
         auto* tenum = static_cast<t_enum*>(type);
         const std::string enum_base = get_enum_base(tenum);
-        std::string t = tmp("ecast");
-        f_cpp_ << indent_cpp() << enum_base << " " << t << ";\n";
+        f_cpp_ << indent_cpp() << enum_base << " _ecast;\n";
         f_cpp_ << indent_cpp() << "if (!reader.read";
         auto it = type->annotations_.find("yarp.name");
         if (it != type->annotations_.end()) {
@@ -1440,7 +1528,7 @@ void t_yarp_generator::generate_deserialize_field(std::ostringstream& f_cpp_,
         } else {
             f_cpp_ << "Enum<" << enum_base << ", " << type_name(type) << "Converter>";
         }
-        f_cpp_ << "(" << t << ")) {\n";
+        f_cpp_ << "(_ecast)) {\n";
         indent_up_cpp();
         {
             generate_deserialize_field_fallback(f_cpp_, tfield, prefix, suffix);
@@ -1451,7 +1539,7 @@ void t_yarp_generator::generate_deserialize_field(std::ostringstream& f_cpp_,
         } else {
             f_cpp_ << indent_cpp() << "}\n";
         }
-        f_cpp_ << indent_cpp() << name << " = static_cast<" << type_name(type) << ">(" << t << ");\n";
+        f_cpp_ << indent_cpp() << name << " = static_cast<" << type_name(type) << ">(_ecast);\n";
         if (tfield->get_value() != nullptr) {
             f_cpp_ << indent_cpp() << "}\n";
         }
@@ -1483,60 +1571,104 @@ void t_yarp_generator::generate_deserialize_struct(std::ostringstream& f_cpp_,
 
 void t_yarp_generator::generate_deserialize_container(std::ostringstream& f_cpp_,
                                                       t_type* ttype,
-                                                      const std::string& prefix)
+                                                      const std::string& name)
 {
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
-    std::string size = tmp("_size");
-    std::string ktype = tmp("_ktype");
-    std::string vtype = tmp("_vtype");
-    std::string etype = tmp("_etype");
-
-    t_container* tcontainer = static_cast<t_container*>(ttype);
-    bool use_push = tcontainer->has_cpp_name();
-
-    f_cpp_ << indent_cpp() << prefix << ".clear();\n";
-    f_cpp_ << indent_cpp() << "uint32_t " << size << ";\n";
-
-    // Declare variables, read header
     if (ttype->is_map()) {
+        f_cpp_ << indent_cpp() << "size_t _csize;\n";
         // kttpe and vtype available
-        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState " << ktype << ";\n";
-        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState " << vtype << ";\n";
-        f_cpp_ << indent_cpp() << "reader.readMapBegin(" << ktype << ", " << vtype << ", " << size << ");\n";
-    } else if (ttype->is_set()) {
-        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState " << etype << ";\n";
-        f_cpp_ << indent_cpp() << "reader.readSetBegin(" << etype << ", " << size << ");\n";
-    } else if (ttype->is_list()) {
-        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState " << etype << ";\n";
-        f_cpp_ << indent_cpp() << "reader.readListBegin(" << etype << ", " << size << ");\n";
-        if (!use_push) {
-            f_cpp_ << indent_cpp() << prefix << ".resize(" << size << ");\n";
-        }
-    }
+        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState _ktype;\n";
+        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState _vtype;\n";
+        f_cpp_ << indent_cpp() << "reader.readMapBegin(_ktype, _vtype, _csize);\n";
 
-    // For loop iterates over elements
-    std::string i = tmp("_i");
-    f_cpp_ << indent_cpp() << "for (size_t " << i << " = 0; " << i << " < " << size << "; ++" << i << ") {\n";
-    indent_up_cpp();
-    {
-        if (ttype->is_map()) {
-            generate_deserialize_map_element(f_cpp_, static_cast<t_map*>(ttype), prefix);
-        } else if (ttype->is_set()) {
-            generate_deserialize_set_element(f_cpp_, static_cast<t_set*>(ttype), prefix);
-        } else if (ttype->is_list()) {
-            generate_deserialize_list_element(f_cpp_, static_cast<t_list*>(ttype), prefix, use_push, prefix + "[" + i + "]");
+        // For loop iterates over elements
+        f_cpp_ << indent_cpp() << "for (size_t _i = 0; _i < _csize; ++_i) {\n";
+        indent_up_cpp();
+        {
+            generate_deserialize_map_element(f_cpp_, static_cast<t_map*>(ttype), name);
         }
-    }
-    indent_down_cpp();
-    f_cpp_ << indent_cpp() << "}\n";
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
 
-    // Read container end
-    if (ttype->is_map()) {
+        // Read container end
         f_cpp_ << indent_cpp() << "reader.readMapEnd();\n";
+
     } else if (ttype->is_set()) {
+        f_cpp_ << indent_cpp() << "size_t _csize;\n";
+        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState _etype;\n";
+        f_cpp_ << indent_cpp() << "reader.readSetBegin(_etype, _csize);\n";
+
+        // For loop iterates over elements
+        f_cpp_ << indent_cpp() << "for (size_t _i = 0; _i < _csize; ++_i) {\n";
+        indent_up_cpp();
+        {
+            generate_deserialize_set_element(f_cpp_, static_cast<t_set*>(ttype), name);
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+
+        // Read container end
         f_cpp_ << indent_cpp() << "reader.readSetEnd();\n";
+
     } else if (ttype->is_list()) {
+        t_container* tcontainer = static_cast<t_container*>(ttype);
+        auto* elem_type = static_cast<t_list*>(ttype)->get_elem_type();
+        bool use_push = tcontainer->has_cpp_name() || (static_cast<t_base_type*>(elem_type)->get_base() == t_base_type::TYPE_BOOL);
+
+        f_cpp_ << indent_cpp() << "size_t _csize;\n";
+        f_cpp_ << indent_cpp() << "yarp::os::idl::WireState _etype;\n";
+        f_cpp_ << indent_cpp() << "reader.readListBegin(_etype, _csize);\n";
+
+        // The check nust be performed only if expected_tag is != 0.
+        // We cannot compare if it is 0, because in this case WireReader
+        // usually returns -1, but I have no idea if there are other corner
+        // cases.
+        // Technically we could compare the string, remove BOTTLE_TAG_LIST
+        // and skip the check if the remaining string is empty, but this is
+        // less error prone, and the check is performed at compile time anyway
+        f_cpp_ << indent_cpp() << "// WireReader removes BOTTLE_TAG_LIST from the tag\n";
+        f_cpp_ << indent_cpp() << "constexpr int expected_tag = ((" << type_to_enum(elem_type) << ") & (~BOTTLE_TAG_LIST));\n";
+        f_cpp_ << indent_cpp() << "if constexpr (expected_tag != 0) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "if (_csize != 0 && _etype.code != expected_tag)" << inline_return_cpp("false");
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+
+        // Do not use block serialization for complex types and for vector<bool>
+        // that does not necessarily store its elements as a contiguous array.
+        if (!is_complex_type(elem_type) && (static_cast<t_base_type*>(elem_type)->get_base() != t_base_type::TYPE_BOOL)) {
+            // For simple types just read the whole data block
+            f_cpp_ << indent_cpp() << name << ".resize(_csize);\n";
+            f_cpp_ << indent_cpp() << "if (_csize != 0 && !reader.readBlock(reinterpret_cast<char*>("
+                            << name
+                            << ".data()), "
+                            << name
+                            << ".size() * sizeof("
+                            << type_name(elem_type)
+                            << ")))"
+                            << inline_return_cpp("false");
+        } else {
+            // For complex types deserialize data one by one
+            if (use_push) {
+                f_cpp_ << indent_cpp() << name << ".clear();\n";
+                f_cpp_ << indent_cpp() << name << ".reserve(_csize);\n";
+            } else {
+                f_cpp_ << indent_cpp() << name << ".resize(_csize);\n";
+            }
+
+            f_cpp_ << indent_cpp() << "for (size_t _i = 0; _i < _csize; ++_i) {\n";
+            indent_up_cpp();
+            {
+                generate_deserialize_list_element(f_cpp_, static_cast<t_list*>(ttype), name, use_push, name + "[_i]");
+            }
+            indent_down_cpp();
+            f_cpp_ << indent_cpp() << "}\n";
+        }
+
+        // Read container end
         f_cpp_ << indent_cpp() << "reader.readListEnd();\n";
     }
 }
@@ -1547,21 +1679,17 @@ void t_yarp_generator::generate_deserialize_map_element(std::ostringstream& f_cp
 {
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
-    std::string lst = tmp("_lst");
-    std::string size = tmp("_size");
-    f_cpp_ << indent_cpp() << "uint32_t " << size << ";\n";
-    f_cpp_ << indent_cpp() << "yarp::os::idl::WireState " << lst << ";\n";
-    f_cpp_ << indent_cpp() << "reader.readListBegin(" << lst << ", " << size << ");\n";
+    f_cpp_ << indent_cpp() << "size_t _msize;\n";
+    f_cpp_ << indent_cpp() << "yarp::os::idl::WireState _lst;\n";
+    f_cpp_ << indent_cpp() << "reader.readListBegin(_lst, _msize);\n";
 
-    std::string key = tmp("_key");
-    std::string val = tmp("_val");
-    t_field fkey(tmap->get_key_type(), key);
-    t_field fval(tmap->get_val_type(), val);
+    t_field fkey(tmap->get_key_type(), "_key");
+    t_field fval(tmap->get_val_type(), "_val");
 
     f_cpp_ << indent_cpp() << declare_field(&fkey) << ";\n";
 
     generate_deserialize_field(f_cpp_, &fkey);
-    f_cpp_ << indent_cpp() << declare_field(&fval, false, false, false, true) << " = " << prefix << "[" << key << "];\n";
+    f_cpp_ << indent_cpp() << declare_field(&fval, false, false, false, true) << " = " << prefix << "[_key];\n";
 
     generate_deserialize_field(f_cpp_, &fval, "", "", true);
 
@@ -1574,14 +1702,13 @@ void t_yarp_generator::generate_deserialize_set_element(std::ostringstream& f_cp
 {
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
-    std::string elem = tmp("_elem");
-    t_field felem(tset->get_elem_type(), elem);
+    t_field felem(tset->get_elem_type(), "_elem");
 
     f_cpp_ << indent_cpp() << declare_field(&felem) << ";\n";
 
     generate_deserialize_field(f_cpp_, &felem, "", "", true);
 
-    f_cpp_ << indent_cpp() << prefix << ".insert(" << elem << ");\n";
+    f_cpp_ << indent_cpp() << prefix << ".insert(_elem);\n";
 }
 
 void t_yarp_generator::generate_deserialize_list_element(std::ostringstream& f_cpp_,
@@ -1593,11 +1720,14 @@ void t_yarp_generator::generate_deserialize_list_element(std::ostringstream& f_c
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
     if (use_push) {
-        std::string elem = tmp("_elem");
-        t_field felem(tlist->get_elem_type(), elem);
+        t_field felem(tlist->get_elem_type(), "_elem");
         f_cpp_ << indent_cpp() << declare_field(&felem) << ";\n";
         generate_deserialize_field(f_cpp_, &felem, "", "", true);
-        f_cpp_ << indent_cpp() << prefix << ".push_back(" << elem << ");\n";
+        if (is_complex_type(tlist->get_elem_type())) {
+            f_cpp_ << indent_cpp() << prefix << ".push_back(std::move(_elem));\n";
+        } else {
+            f_cpp_ << indent_cpp() << prefix << ".push_back(_elem);\n";
+        }
     } else {
         t_field felem(tlist->get_elem_type(), list_elem);
         generate_deserialize_field(f_cpp_, &felem, "", "", true);
@@ -1633,7 +1763,6 @@ std::string t_yarp_generator::declare_field(t_field* tfield,
 
     result += prefix;
     result += tfield->get_name();
-
     if (init) {
         t_type* type = get_true_type(tfield->get_type());
 
@@ -1643,19 +1772,35 @@ std::string t_yarp_generator::declare_field(t_field* tfield,
             case t_base_type::TYPE_VOID:
                 break;
             case t_base_type::TYPE_STRING:
-                result += "{}";
+                if (tfield->get_value())
+                    result += "{\""+tfield->get_value()->get_string()+"\"}";
+                else
+                    result += "{}";
                 break;
             case t_base_type::TYPE_BOOL:
-                result += "{false}";
+                if (tfield->get_value())
+                {
+                    int b=tfield->get_value()->get_integer();
+                    if (b==1) {result += "{true}";}
+                    else {result += "{false}";}
+                }
+                else
+                    result += "{false}";
                 break;
             case t_base_type::TYPE_I8:
             case t_base_type::TYPE_I16:
             case t_base_type::TYPE_I32:
             case t_base_type::TYPE_I64:
-                result += "{0}";
+                if (tfield->get_value())
+                    result += "{"+ std::to_string(tfield->get_value()->get_integer())+"}";
+                else
+                    result += "{0}";
                 break;
             case t_base_type::TYPE_DOUBLE:
-                result += "{0.0}";
+                if (tfield->get_value())
+                    result += "{"+ std::to_string(tfield->get_value()->get_double())+"}";
+                else
+                    result += "{0.0}";
                 break;
             default:
                 throw "compiler error: no C++ initializer for base type " + t_base_type::t_base_name(tbase);
@@ -1774,10 +1919,9 @@ std::string t_yarp_generator::render_const_value(std::ostringstream& f_cpp_,
     } else if (type->is_enum()) {
         render << "static_cast<" << type_name(type) << ">(" << value->get_integer() << ")";
     } else {
-        std::string t = tmp("tmp");
-        f_cpp_ << indent_cpp() << type_name(type) << " " << t << ";\n";
-        print_const_value(f_cpp_, t, type, value);
-        render << t;
+        f_cpp_ << indent_cpp() << type_name(type) << " _tmp;\n";
+        print_const_value(f_cpp_, "_tmp", type, value);
+        render << "_tmp";
     }
 
     return render.str();
@@ -2190,10 +2334,10 @@ void t_yarp_generator::generate_struct(t_struct* tstruct)
     generate_struct_unwrapped_helper(tstruct, f_h_, f_cpp_);
 
     // Add editor class, if not disabled
-    bool editor_enabled = !no_editor_;
+    bool editor_enabled = false;
     if (annotations.find("yarp.editor") != annotations.end()) {
-        if (annotations.at("yarp.editor") == "false") {
-            editor_enabled = false;
+        if (annotations.at("yarp.editor") == "true") {
+            editor_enabled = true;
         }
     }
 
@@ -2337,7 +2481,8 @@ void t_yarp_generator::generate_struct_read_wirereader(t_struct* tstruct, std::o
         for (const auto& member : members) {
             f_cpp_ << indent_cpp() << "if (!" << (is_member_nested(member) ? "nested_" : "") << "read_" << member->get_name() << "(reader))" << inline_return_cpp("false");
         }
-        f_cpp_ << indent_cpp() << "return !reader.isError();\n";
+        f_cpp_ << indent_cpp() << "if (reader.isError())" << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "return true;\n";
     }
     indent_down_cpp();
     f_cpp_ << indent_cpp() << "}\n";
@@ -2365,7 +2510,8 @@ void t_yarp_generator::generate_struct_read_connectionreader(t_struct* tstruct, 
     {
         f_cpp_ << indent_cpp() << "yarp::os::idl::WireReader reader(connection);\n";
         f_cpp_ << indent_cpp() << "if (!reader.readListHeader(" << flat_element_count(tstruct) << "))" << inline_return_cpp("false");
-        f_cpp_ << indent_cpp() << "return read(reader);\n";
+        f_cpp_ << indent_cpp() << "if (!read(reader))" << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "return true;\n";
     }
     indent_down_cpp();
     f_cpp_ << indent_cpp() << "}\n";
@@ -2395,7 +2541,8 @@ void t_yarp_generator::generate_struct_write_wirewriter(t_struct* tstruct, std::
         for (const auto& member : members) {
             f_cpp_ << indent_cpp() << "if (!" << (is_member_nested(member) ? "nested_" : "") << "write_" << member->get_name() << "(writer))" << inline_return_cpp("false");
         }
-        f_cpp_ << indent_cpp() << "return !writer.isError();\n";
+        f_cpp_ << indent_cpp() << "if (writer.isError())" << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "return true;\n";
     }
     indent_down_cpp();
     f_cpp_ << indent_cpp() << "}\n";
@@ -2423,7 +2570,8 @@ void t_yarp_generator::generate_struct_write_connectionwriter(t_struct* tstruct,
     {
         f_cpp_ << indent_cpp() << "yarp::os::idl::WireWriter writer(connection);\n";
         f_cpp_ << indent_cpp() << "if (!writer.writeListHeader(" << flat_element_count(tstruct) << "))" << inline_return_cpp("false");
-        f_cpp_ << indent_cpp() << "return write(writer);\n";
+        f_cpp_ << indent_cpp() << "if (!write(writer))" << inline_return_cpp("false");
+        f_cpp_ << indent_cpp() << "return true;\n";
     }
     indent_down_cpp();
     f_cpp_ << indent_cpp() << "}\n";
@@ -2450,7 +2598,7 @@ void t_yarp_generator::generate_struct_tostring(t_struct* tstruct, std::ostrings
     indent_up_cpp();
     {
         f_cpp_ << indent_cpp() << "yarp::os::Bottle b;\n";
-        f_cpp_ << indent_cpp() << "b.read(*this);\n";
+        f_cpp_ << indent_cpp() << "if (!yarp::os::Portable::copyPortable(*this, b))" << inline_return_cpp("{}");
         f_cpp_ << indent_cpp() << "return b.toString();\n";
     }
     indent_down_cpp();
@@ -3466,6 +3614,7 @@ void t_yarp_generator::generate_service(t_service* tservice)
 
     const auto& service_name = tservice->get_name();
     const auto& extends_service = tservice->get_extends();
+    const auto& annotations = tservice->annotations_;
 
     // Open header file
     std::string f_header_name = get_out_dir() + get_include_prefix(program_) + service_name + ".h";
@@ -3493,9 +3642,22 @@ void t_yarp_generator::generate_service(t_service* tservice)
     f_h_ << "#define YARP_THRIFT_GENERATOR_SERVICE_" << upcase_string(service_name) << "_H\n";
     f_h_ << '\n';
 
+    // Add monitor class, if not disabled
+    bool monitor_enabled = false;
+    if (annotations.find("yarp.monitor") != annotations.end()) {
+        if (annotations.at("yarp.monitor") == "true") {
+            monitor_enabled = true;
+        }
+    }
+
     // Add includes to .h file
     f_h_ << "#include <yarp/os/Wire.h>\n";
     f_h_ << "#include <yarp/os/idl/WireTypes.h>\n";
+    if (monitor_enabled) {
+        f_h_ << "#include <yarp/os/MonitorObject.h>\n";
+        f_h_ << "#include <yarp/os/Port.h>\n";
+        f_h_ << "#include <yarp/os/Things.h>\n";
+    }
 
     if (need_common_) {
         f_h_ << "#include <" << get_include_prefix(program_) << program_->get_name() << "_common.h>" << '\n';
@@ -3525,8 +3687,29 @@ void t_yarp_generator::generate_service(t_service* tservice)
     // Add includes to .cpp file
     f_cpp_ << "#include <" << get_include_prefix(tservice->get_program()) + service_name + ".h>" << '\n';
     f_cpp_ << '\n';
+    if (monitor_enabled) {
+        f_cpp_ << "#include <yarp/os/LogComponent.h>\n";
+        f_cpp_ << "#include <yarp/os/LogStream.h>\n";
+        f_cpp_ << "#include <yarp/os/SystemClock.h>\n";
+        f_cpp_ << "#include <yarp/os/CommandBottle.h>\n";
+        f_cpp_ << "#include <map>\n";
+    }
     f_cpp_ << "#include <yarp/os/idl/WireTypes.h>\n";
     f_cpp_ << '\n';
+    f_cpp_ << "#include <algorithm>\n";
+    f_cpp_ << '\n';
+
+    // Produce an error if a function starts with the same name as another one
+    for (const auto& f1 : tservice->get_functions()) {
+        for (const auto& f2 : tservice->get_functions()) {
+            if ((f1->get_name().rfind(f2->get_name() + '_', 0) == 0)) {
+                 f_cpp_ << "YARP_COMPILER_ERROR(\"'" << f1->get_name() << "' will never be called, since '" << f2->get_name() << "' starts with the same tag\")\n";
+            }
+        }
+        if ((f1->get_name().rfind("help_", 0) == 0)) {
+            f_cpp_ << "YARP_COMPILER_ERROR(\"'" << f1->get_name() << "' will never be called, since it starts with 'help_'\")\n";
+        }
+    }
 
     // Open namespace
     generate_namespace_open(f_h_, f_cpp_);
@@ -3554,6 +3737,12 @@ void t_yarp_generator::generate_service(t_service* tservice)
 
     generate_service_help(tservice, f_h_, f_cpp_);
     generate_service_read(tservice, f_h_, f_cpp_);
+
+    if (monitor_enabled) {
+        f_h_ << '\n';
+        f_cpp_ << '\n';
+        generate_service_monitor(tservice, f_h_, f_cpp_);
+    }
 
     indent_down_h();
 
@@ -3720,7 +3909,7 @@ void t_yarp_generator::generate_service_helper_classes_decl(t_function* function
                     }
                     first = false;
                     f_cpp_ << '\n';
-                    f_cpp_ << indent_cpp() << "\"" << replaceInString(helpStr, "\"", "\\\"");
+                    f_cpp_ << indent_cpp() << "\"" << helpStr;
                 }
             }
             indent_down_cpp();
@@ -4023,7 +4212,7 @@ void t_yarp_generator::generate_service_helper_classes_impl_command_readtag(t_fu
     f_cpp_ << indent_cpp() << "{\n";
     indent_up_cpp();
     {
-        f_cpp_ << indent_cpp() << "std::string tag = reader.readTag();\n";
+        f_cpp_ << indent_cpp() << "std::string tag = reader.readTag(s_tag_len);\n";
         f_cpp_ << indent_cpp() << "if (reader.isError())" << inline_return_cpp("false");
         f_cpp_ << indent_cpp() << "if (tag != s_tag) {\n";
         indent_up_cpp();
@@ -4129,10 +4318,12 @@ void t_yarp_generator::generate_service_helper_classes_impl_reply_write_wirewrit
         indent_up_cpp();
         {
             if (!function->is_oneway()) {
-                if (returntype->annotations_.find("yarp.name") == (returntype->annotations_.end())) {
+                if (returntype->is_enum() || returntype->annotations_.find("yarp.name") == (returntype->annotations_.end())) {
                     // Types annotated with yarp.name therefore are expected
                     // to be able to serialize by themselves, therefore there is
                     // no need to write them as lists.
+                    // Enums are excluded even if annotated with yarp.name, and
+                    // should be handled like any other type
                     // For all the other types, append the number of fields
                     f_cpp_ << indent_cpp() << "if (!writer.writeListHeader(s_reply_len))" << inline_return_cpp("false");
                 }
@@ -4174,10 +4365,12 @@ void t_yarp_generator::generate_service_helper_classes_impl_reply_read_wirereade
     indent_up_cpp();
     {
         if (!function->is_oneway()) {
-            if (returntype->annotations_.find("yarp.name") == (returntype->annotations_.end())) {
+            if (returntype->is_enum() || returntype->annotations_.find("yarp.name") == (returntype->annotations_.end())) {
                 // Types annotated with yarp.name therefore are expected
                 // to be able to serialize by themselves, therefore there is
                 // no need to read them as lists.
+                // Enums are excluded even if annotated with yarp.name, and
+                // should be handled like any other type
                 f_cpp_ << indent_cpp() << "if (!reader.readListReturn())" << inline_return_cpp("false");
             }
             if (!returntype->is_void()) {
@@ -4231,7 +4424,7 @@ void t_yarp_generator::generate_service_helper_classes_impl_call(t_function* fun
     f_cpp_ << '\n';
 }
 
-void t_yarp_generator::generate_service_constructor(t_service* tservice, std::ostringstream&  f_h_, std::ostringstream& f_cpp_)
+void t_yarp_generator::generate_service_constructor(t_service* /*tservice*/, std::ostringstream&  f_h_, std::ostringstream& f_cpp_)
 {
     THRIFT_DEBUG_COMMENT(f_h_);
     THRIFT_DEBUG_COMMENT(f_cpp_);
@@ -4256,7 +4449,7 @@ void t_yarp_generator::generate_service_constructor(t_service* tservice, std::os
     assert(indent_count_cpp() == 0);
 }
 
-void t_yarp_generator::generate_service_method(t_service* tservice, t_function* function, std::ostringstream&  f_h_, std::ostringstream& f_cpp_)
+void t_yarp_generator::generate_service_method(t_service* /*tservice*/, t_function* function, std::ostringstream&  f_h_, std::ostringstream& f_cpp_)
 {
     THRIFT_DEBUG_COMMENT(f_h_);
     THRIFT_DEBUG_COMMENT(f_cpp_);
@@ -4396,6 +4589,16 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
     THRIFT_DEBUG_COMMENT(f_h_);
     THRIFT_DEBUG_COMMENT(f_cpp_);
 
+    const size_t max_tag_len = [tservice]() {
+        size_t max = 0;
+        for (const auto& function : tservice->get_functions()) {
+            const auto& fname = function->get_name();
+            const size_t tag_len = std::count(fname.begin(), fname.end(), '_') + 1;
+            max = std::max(max, tag_len);
+        }
+        return max;
+    }();
+
     f_h_ << indent_h() << "// read from ConnectionReader\n";
     f_h_ << indent_h() << "bool read(yarp::os::ConnectionReader& connection) override;\n";
 
@@ -4404,6 +4607,10 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
     f_cpp_ << indent_cpp() << "{\n";
     indent_up_cpp();
     {
+        f_cpp_ << indent_cpp() << "constexpr size_t max_tag_len = " << max_tag_len << ";\n";
+        f_cpp_ << indent_cpp() << "size_t tag_len = 1;\n";
+        f_cpp_ << '\n';
+
         f_cpp_ << indent_cpp() << "yarp::os::idl::WireReader reader(connection);\n";
         f_cpp_ << indent_cpp() << "reader.expectAccept();\n";
         f_cpp_ << indent_cpp() << "if (!reader.readListHeader()) {\n";
@@ -4417,16 +4624,16 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
 
         f_cpp_ << '\n';
 
-        f_cpp_ << indent_cpp() << "std::string tag = reader.readTag();\n";
+        f_cpp_ << indent_cpp() << "std::string tag = reader.readTag(1);\n";
         f_cpp_ << indent_cpp() << "bool direct = (tag == \"__direct__\");\n";
         f_cpp_ << indent_cpp() << "if (direct) {\n";
         indent_up_cpp();
         {
-            f_cpp_ << indent_cpp() << "tag = reader.readTag();\n";
+            f_cpp_ << indent_cpp() << "tag = reader.readTag(1);\n";
         }
         indent_down_cpp();
         f_cpp_ << indent_cpp() << "}\n";
-        f_cpp_ << indent_cpp() << "while (!reader.isError()) {\n";
+        f_cpp_ << indent_cpp() << "while (tag_len <= max_tag_len && !reader.isError()) {\n";
         indent_up_cpp();
         {
             // TODO: use quick lookup, this is just a test
@@ -4501,7 +4708,7 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
                 {
                     f_cpp_ << indent_cpp() << "if (!writer.writeListHeader(2))" << inline_return_cpp("false");
                     f_cpp_ << indent_cpp() << "if (!writer.writeTag(\"many\", 1, 0))" << inline_return_cpp("false");
-                    f_cpp_ << indent_cpp() << "if (!writer.writeListBegin(BOTTLE_TAG_INT32, static_cast<uint32_t>(help_strings.size())))" << inline_return_cpp("false");
+                    f_cpp_ << indent_cpp() << "if (!writer.writeListBegin(0, help_strings.size()))" << inline_return_cpp("false");
                     f_cpp_ << indent_cpp() << "for (const auto& help_string : help_strings) {\n";
                     indent_up_cpp();
                     {
@@ -4528,7 +4735,7 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
             indent_down_cpp();
             f_cpp_ << indent_cpp() << "}\n";
 
-            f_cpp_ << indent_cpp() << "std::string next_tag = reader.readTag();\n";
+            f_cpp_ << indent_cpp() << "std::string next_tag = reader.readTag(1);\n";
             f_cpp_ << indent_cpp() << "if (next_tag.empty()) {\n";
             indent_up_cpp();
             {
@@ -4537,6 +4744,7 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
             indent_down_cpp();
             f_cpp_ << indent_cpp() << "}\n";
             f_cpp_ << indent_cpp() << "tag.append(\"_\").append(next_tag);\n";
+            f_cpp_ << indent_cpp() << "tag_len = std::count(tag.begin(), tag.end(), '_') + 1;\n";
         }
         indent_down_cpp();
         f_cpp_ << indent_cpp() << "}\n";
@@ -4549,6 +4757,340 @@ void t_yarp_generator::generate_service_read(t_service* tservice, std::ostringst
     assert(indent_count_cpp() == 0);
 }
 
+/******************************************************************************/
+// BEGIN generate_service_monitor
+
+void t_yarp_generator::generate_service_monitor(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_)
+{
+    THRIFT_DEBUG_COMMENT(f_h_);
+    THRIFT_DEBUG_COMMENT(f_cpp_);
+
+    const auto& name = tservice->get_name();
+    const auto log_component = name + "_MONITOR";
+//     const auto& members = tservice->get_members();
+
+    std::string ns = program_->get_namespace("yarp");
+    if (ns.empty()) {
+        ns = "yarp.thrift";
+    }
+
+    f_cpp_ << indent_cpp() << "// Monitor: log component\n";
+    f_cpp_ << indent_cpp() << "namespace {\n";
+    f_cpp_ << indent_cpp() << "YARP_LOG_COMPONENT(" << log_component << ",\n";
+    f_cpp_ << indent_cpp() << "                   \"" << ns << ".monitor." << name << "\",\n";
+    f_cpp_ << indent_cpp() << "                   yarp::os::Log::minimumPrintLevel(),\n";
+    f_cpp_ << indent_cpp() << "                   yarp::os::Log::LogTypeReserved,\n";
+    f_cpp_ << indent_cpp() << "                   yarp::os::Log::printCallback(),\n";
+    f_cpp_ << indent_cpp() << "                   nullptr)\n";
+    f_cpp_ << '\n';
+
+    f_cpp_ << "bool split(const std::string &s, std::map<std::string, std::string>& parameters) {\n";
+    indent_up_cpp();
+    {
+        f_cpp_ << indent_cpp() << "std::istringstream iss(s);\n";
+        f_cpp_ << indent_cpp() << "std::string item;\n";
+        f_cpp_ << indent_cpp() << "while (std::getline(iss, item, '+')) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "const auto point = item.find('.');\n";
+            f_cpp_ << indent_cpp() << "parameters[item.substr(0, point)] = item.substr(point + 1);\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+        f_cpp_ << indent_cpp() << "return true;\n";
+    }
+    indent_down_cpp();
+    f_cpp_ << "}\n";
+    f_cpp_ << "} // namespace\n";
+    f_cpp_ << '\n';
+
+    f_h_ << indent_h() << "// Monitor: class declaration\n";
+    f_h_ << indent_h() << "class Monitor :\n";
+    f_h_ << indent_initializer_h() << "public yarp::os::MonitorObject\n";
+    f_h_ << indent_h() << "{\n";
+    indent_up_h();
+    {
+        // Public members
+        f_h_ << indent_access_specifier_h() << "public:\n";
+        f_h_ << indent_h() << "bool create(const yarp::os::Property& options) override;\n";
+        f_h_ << indent_h() << "yarp::os::Things& update(yarp::os::Things& thing) override;\n";
+        f_h_ << indent_h() << "yarp::os::Things& updateReply(yarp::os::Things& thing) override;\n";
+        f_h_ << '\n';
+
+        // Private members
+        f_h_ << indent_access_specifier_h() << "private:\n";
+        f_h_ << indent_h() << "bool sender;\n";
+        f_h_ << indent_h() << "std::string source;\n";
+        f_h_ << indent_h() << "std::string destination;\n";
+        f_h_ << indent_h() << "yarp::os::Port port;\n";
+    }
+    indent_down_h();
+    f_h_ << indent_h() << "};\n";
+    f_h_ << '\n';
+
+    generate_service_monitor_create(tservice, f_h_, f_cpp_);
+    generate_service_monitor_update(tservice, f_h_, f_cpp_);
+    generate_service_monitor_updatereply(tservice, f_h_, f_cpp_);
+
+    assert(indent_count_h() == 1);
+    assert(indent_count_cpp() == 0);
+}
+
+
+void t_yarp_generator::generate_service_monitor_create(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_)
+{
+    THRIFT_DEBUG_COMMENT(f_h_);
+    THRIFT_DEBUG_COMMENT(f_cpp_);
+
+    const auto& name = tservice->get_name();
+    const auto log_component = name + "_MONITOR";
+
+
+    f_cpp_ << indent_cpp() << "// Monitor: create\n";
+    f_cpp_ << indent_cpp() << "bool " << name << "::Monitor::create(const yarp::os::Property& options)\n";
+    f_cpp_ << indent_cpp() << "{\n";
+    indent_up_cpp();
+    {
+        f_cpp_ << indent_cpp() << "sender = options.find(\"sender_side\").asBool();\n";
+        f_cpp_ << indent_cpp() << "source = options.find(\"source\").asString();\n";
+        f_cpp_ << indent_cpp() << "destination = options.find(\"destination\").asString();\n";
+        f_cpp_ << indent_cpp() << "const std::string source_port = (sender ? source : destination) + \"/monitor\";\n";
+
+        f_cpp_ << indent_cpp() << "// Check the 'monitor' parameter\n";
+        f_cpp_ << indent_cpp() << "const std::string carrier = options.find(\"carrier\").asString();\n";
+        f_cpp_ << indent_cpp() << "std::map<std::string, std::string> parameters;\n";
+        f_cpp_ << indent_cpp() << "if (!split(carrier, parameters)) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCError(" << log_component << ", \"Error parsing the parameters.\");\n";
+            f_cpp_ << indent_cpp() << "return false;\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+        f_cpp_ << indent_cpp() << "const std::string monitor_port = ((parameters.find(\"monitor\") != parameters.end()) ? parameters[\"monitor\"] : \"/monitor\");\n";
+        f_cpp_ << '\n';
+        f_cpp_ << indent_cpp() << "if (!sender) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCError(" << log_component << ", \"Attaching on receiver side is not supported yet.\");\n";
+            f_cpp_ << indent_cpp() << "return false;\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+
+        f_cpp_ << indent_cpp() << "if (!port.openFake(source_port)) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCError(" << log_component << ", \"Could not open port %s.\", source_port.c_str());\n";
+            f_cpp_ << indent_cpp() << "return false;\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+        f_cpp_ << indent_cpp() << "if (!port.addOutput(monitor_port)) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCError(" << log_component << ", \"Could not connect to port %s.\", monitor_port.c_str());\n";
+            f_cpp_ << indent_cpp() << "return false;\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+        f_cpp_ << indent_cpp() << "return true;\n";
+    }
+    indent_down_cpp();
+    f_cpp_ << indent_cpp() << "}\n";
+    f_cpp_ << '\n';
+
+    assert(indent_count_h() == 1);
+    assert(indent_count_cpp() == 0);
+}
+
+void t_yarp_generator::generate_service_monitor_update(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_)
+{
+    THRIFT_DEBUG_COMMENT(f_h_);
+    THRIFT_DEBUG_COMMENT(f_cpp_);
+
+    const auto& name = tservice->get_name();
+    const auto log_component = name + "_MONITOR";
+
+
+    f_cpp_ << indent_cpp() << "// Monitor: update\n";
+    f_cpp_ << indent_cpp() << "yarp::os::Things& " << name << "::Monitor::update(yarp::os::Things& thing)\n";
+    f_cpp_ << indent_cpp() << "{\n";
+    indent_up_cpp();
+    {
+        f_cpp_ << indent_cpp() << "yarp::os::Bottle msg;\n";
+        f_cpp_ << indent_cpp() << "msg.addFloat64(yarp::os::SystemClock::nowSystem());\n";
+        f_cpp_ << indent_cpp() << "msg.addString(source);\n";
+        f_cpp_ << indent_cpp() << "msg.addString(destination);\n";
+        f_cpp_ << indent_cpp() << "msg.addString(\"command\");\n";
+//         f_cpp_ << indent_cpp() << "msg.addVocab32(sender ? '1' : 0);\n"; // NOTE: Check bool definition in Storable
+        f_cpp_ << indent_cpp() << "msg.addString(sender ? \"client\" : \"server\");\n";
+        f_cpp_ << indent_cpp() << "msg.addString(\"" << name << "\");\n";
+        f_cpp_ << indent_cpp() << "auto& bcmd = msg.addList();\n";
+        f_cpp_ << indent_cpp() << "auto& bargs [[maybe_unused]] = msg.addList();\n";
+        f_cpp_ << indent_cpp() << "auto& breply [[maybe_unused]] = msg.addList();\n";
+        f_cpp_ << '\n';
+
+        f_cpp_ << indent_cpp();
+        bool first = true;
+        for (const auto& function : tservice->get_functions()) {
+            const auto& fname = function->get_name();
+            const auto& returntype = function->get_returntype();
+            const auto helper_class = std::string{service_name_ + "_" + fname + "_helper"};
+            auto returnfield = t_field{returntype, "m_return_helper"};
+
+            if (!first) {
+                f_cpp_ << " else ";
+            }
+            first = false;
+
+            f_cpp_ << "if (const auto* cmd = thing.cast_as<" << helper_class << ">()) {\n";
+            indent_up_cpp();
+            {
+                f_cpp_ << indent_cpp() << "bcmd.addString(" << helper_class << "::s_tag);\n";
+                f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(cmd->cmd, bargs);\n";
+            }
+            indent_down_cpp();
+            f_cpp_ << indent_cpp() << "}";
+        }
+
+        // RPC Client is not using the thrift client. Probably yarp rpc or
+        // something custom rpc client
+
+        f_cpp_ << " else if (const auto* reply = thing.cast_as<yarp::os::CommandBottle>()) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "bcmd.addString(reply->cmd.get(0).toString());\n";
+            f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(reply->cmd, bargs);\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}";
+
+        f_cpp_ << " else if (const auto* cmd = thing.cast_as<yarp::os::Bottle>()) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "bcmd.addString(cmd->get(0).toString());\n";
+            f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(*cmd, bargs);\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}";
+
+        f_cpp_ << " else {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCWarning(" << log_component << ") << \"Sending unknown command\";\n";
+            f_cpp_ << indent_cpp() << "bcmd.addString(\"[unknown]\");\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+
+        f_cpp_ << indent_cpp() << "yCDebug(" << log_component << ", \"Writing: %s\", msg.toString().c_str());\n";
+        f_cpp_ << indent_cpp() << "port.write(msg);\n";
+        f_cpp_ << indent_cpp() << "return thing;\n";
+    }
+    indent_down_cpp();
+    f_cpp_ << indent_cpp() << "}\n";
+    f_cpp_ << '\n';
+
+    assert(indent_count_h() == 1);
+    assert(indent_count_cpp() == 0);
+}
+
+void t_yarp_generator::generate_service_monitor_updatereply(t_service* tservice, std::ostringstream& f_h_, std::ostringstream& f_cpp_)
+{
+    THRIFT_DEBUG_COMMENT(f_h_);
+    THRIFT_DEBUG_COMMENT(f_cpp_);
+
+    const auto& name = tservice->get_name();
+    const auto log_component = name + "_MONITOR";
+
+
+    f_cpp_ << indent_cpp() << "// Monitor: updateReply\n";
+    f_cpp_ << indent_cpp() << "yarp::os::Things& " << name << "::Monitor::updateReply(yarp::os::Things& thing)\n";
+    f_cpp_ << indent_cpp() << "{\n";
+    indent_up_cpp();
+    {
+        f_cpp_ << indent_cpp() << "yarp::os::Bottle msg;\n";
+        f_cpp_ << indent_cpp() << "msg.addFloat64(yarp::os::SystemClock::nowSystem());\n";
+        f_cpp_ << indent_cpp() << "msg.addString(source);\n";
+        f_cpp_ << indent_cpp() << "msg.addString(destination);\n";
+        f_cpp_ << indent_cpp() << "msg.addString(\"reply\");\n";
+//         f_cpp_ << indent_cpp() << "msg.addVocab32(sender ? '1' : 0);\n"; // NOTE: Check bool definition in Storable
+        f_cpp_ << indent_cpp() << "msg.addString(sender ? \"rpc client\" : \"rpc server\");\n";
+        f_cpp_ << indent_cpp() << "msg.addString(\"" << name << "\");\n";
+        f_cpp_ << indent_cpp() << "auto& bcmd = msg.addList();\n";
+        f_cpp_ << indent_cpp() << "auto& bargs [[maybe_unused]] = msg.addList();\n";
+        f_cpp_ << indent_cpp() << "auto& breply [[maybe_unused]] = msg.addList();\n";
+        f_cpp_ << '\n';
+
+        f_cpp_ << indent_cpp();
+        bool first = true;
+        for (const auto& function : tservice->get_functions()) {
+            const auto& fname = function->get_name();
+            const auto& returntype = function->get_returntype();
+            const auto helper_class = std::string{service_name_ + "_" + fname + "_helper"};
+            auto returnfield = t_field{returntype, "m_return_helper"};
+
+            if (!first) {
+                f_cpp_ << " else ";
+            }
+            first = false;
+
+            f_cpp_ << "if (const auto* reply = thing.cast_as<" << helper_class << ">()) {\n";
+            indent_up_cpp();
+            {
+                f_cpp_ << indent_cpp() << "bcmd.addString(" << helper_class << "::s_tag);\n";
+                f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(reply->cmd, bargs);\n";
+                f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(reply->reply, breply);\n";
+            }
+            indent_down_cpp();
+            f_cpp_ << indent_cpp() << "}";
+        }
+
+        // RPC Client is not using the thrift client. Probably yarp rpc or
+        // something custom rpc client
+
+        f_cpp_ << " else if (const auto* reply = thing.cast_as<yarp::os::CommandBottle>()) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "bcmd.addString(reply->cmd.get(0).toString());\n";
+            f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(reply->cmd, bargs);\n";
+            f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(reply->reply, breply);\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}";
+
+        f_cpp_ << " else if (const auto* reply = thing.cast_as<yarp::os::Bottle>()) {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yarp::os::Portable::copyPortable(*reply, breply);\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}";
+
+        f_cpp_ << " else {\n";
+        indent_up_cpp();
+        {
+            f_cpp_ << indent_cpp() << "yCWarning(" << log_component << ") << \"Received unknown reply\";\n";
+            f_cpp_ << indent_cpp() << "bcmd.addString(\"[unknown]\");\n";
+        }
+        indent_down_cpp();
+        f_cpp_ << indent_cpp() << "}\n";
+
+        f_cpp_ << indent_cpp() << "yCDebug(" << log_component << ", \"Writing: %s\", msg.toString().c_str());\n";
+        f_cpp_ << indent_cpp() << "port.write(msg);\n";
+        f_cpp_ << indent_cpp() << "return thing;\n";    }
+    indent_down_cpp();
+    f_cpp_ << indent_cpp() << "}\n";
+
+    assert(indent_count_h() == 1);
+    assert(indent_count_cpp() == 0);
+}
+
+
+// END generate_service_monitor
+/******************************************************************************/
+
 // END generate_service
 /******************************************************************************/
 
@@ -4559,6 +5101,5 @@ THRIFT_REGISTER_GENERATOR(
     "    include_prefix:       The include prefix to use for the generated files\n"
     "    no_namespace_prefix:  Omit the namespace from the include prefix\n"
     "    no_copyright:         Omit the copyright header.\n"
-    "    no_editor:            Omit the generation of the Editor class for structs.\n"
     "    no_doc:               Omit doxygen documentation.\n"
     "    debug_generator:      Add generator debug information in generated code.\n")

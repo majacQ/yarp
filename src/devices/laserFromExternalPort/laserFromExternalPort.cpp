@@ -33,29 +33,6 @@ using namespace yarp::dev;
 
 YARP_LOG_COMPONENT(LASER_FROM_EXTERNAL_PORT, "yarp.devices.laserFromExternalPort")
 
-/*
-yarpdev --device Rangefinder2DWrapper --subdevice laserFromExternalPort \
---SENSOR::input_ports_name "(/port1 /port2)" \
---TRANSFORM_CLIENT::local /LaserFromExternalPort/tfClient \
---TRANSFORM_CLIENT::remote /transformServer \
---TRANSFORMS::src_frames "(/frame1 /frame2)" \
---TRANSFORMS::dst_frame /output_frame
---period 10 \
---name /outlaser:o
-
-yarpdev --device Rangefinder2DWrapper --subdevice laserFromExternalPort \
---SENSOR::min_angle 0
---SENSOR::max_angle 360
---SENSOR::resolution 0.5
---SENSOR::input_ports_name "(/port1 /port2)" \
---TRANSFORM_CLIENT::local /LaserFromExternalPort/tfClient \
---TRANSFORM_CLIENT::remote /transformServer \
---TRANSFORMS::src_frames "(/frame1 /frame2)" \
---TRANSFORMS::dst_frame /output_frame
---period 10 \
---name /outlaser:o
-*/
-
 double constrainAngle(double x)
 {
     x = fmod(x, 360);
@@ -70,7 +47,7 @@ InputPortProcessor::InputPortProcessor()
     m_contains_data=false;
 }
 
-void InputPortProcessor::onRead(yarp::dev::LaserScan2D& b)
+void InputPortProcessor::onRead(yarp::sig::LaserScan2D& b)
 {
     m_port_mutex.lock();
         m_lastScan = b;
@@ -79,7 +56,7 @@ void InputPortProcessor::onRead(yarp::dev::LaserScan2D& b)
     m_port_mutex.unlock();
 }
 
-inline void InputPortProcessor::getLast(yarp::dev::LaserScan2D& data, Stamp& stmp)
+inline void InputPortProcessor::getLast(yarp::sig::LaserScan2D& data, Stamp& stmp)
 {
     //this blocks untils the first data is received;
     size_t counter =0;
@@ -272,35 +249,35 @@ bool LaserFromExternalPort::close()
 
 
 
-bool LaserFromExternalPort::setDistanceRange(double min, double max)
+ReturnValue LaserFromExternalPort::setDistanceRange(double min, double max)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_min_distance = min;
     m_max_distance = max;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool LaserFromExternalPort::setScanLimits(double min, double max)
+ReturnValue LaserFromExternalPort::setScanLimits(double min, double max)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     yCWarning(LASER_FROM_EXTERNAL_PORT) << "setScanLimits not yet implemented";
-    return true;
+    return ReturnValue_ok;
 }
 
 
 
-bool LaserFromExternalPort::setHorizontalResolution(double step)
+ReturnValue LaserFromExternalPort::setHorizontalResolution(double step)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     yCWarning(LASER_FROM_EXTERNAL_PORT, "setHorizontalResolution not yet implemented");
-    return true;
+    return ReturnValue_ok;
 }
 
-bool LaserFromExternalPort::setScanRate(double rate)
+ReturnValue LaserFromExternalPort::setScanRate(double rate)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     yCWarning(LASER_FROM_EXTERNAL_PORT, "setScanRate not yet implemented");
-    return false;
+    return ReturnValue::return_code::return_value_error_not_implemented_by_device;
 }
 
 
@@ -315,7 +292,7 @@ bool LaserFromExternalPort::threadInit()
     return true;
 }
 
-void LaserFromExternalPort::calculate(yarp::dev::LaserScan2D scan_data, yarp::sig::Matrix m)
+void LaserFromExternalPort::calculate(yarp::sig::LaserScan2D scan_data, yarp::sig::Matrix m)
 {
     yarp::sig::Vector temp(3);
     temp = yarp::math::dcm2rpy(m);

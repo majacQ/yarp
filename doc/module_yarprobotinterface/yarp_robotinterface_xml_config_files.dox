@@ -1,0 +1,151 @@
+/**
+\ingroup  robointerface_all
+\defgroup yarp_robotinterface_xml_config_files YARP robotinterface XML files
+
+\tableofcontents
+
+This tutorial covers how to write and read XML files that are used by \ref yarprobotinterface "yarprobotinterface tool"
+and by the \ref robointerface_all "libYARP_robotinterface C++ library".
+
+\section yarp_robotinterface_xml_config_files_basics A minimal XML file
+
+Here is a minimal config file, let's call it "config.xml":
+\code
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE robot PUBLIC "-//YARP//DTD yarprobotinterface 3.0//EN" "http://www.yarp.it/DTD/yarprobotinterfaceV3.0.dtd">
+
+<robot name="robotinterfaceExample" portprefix="/icub" build="0" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <devices>
+        <device name="fake_motor_device" type="fakeMotionControl">
+            <group name="GENERAL">
+                <!-- Number of joints of the fake_motor_device -->
+                <param name="Joints">            3         </param>
+            </group>
+        </device>
+        <device name="fake_motor_nws_yarp" type="controlBoard_nws_yarp">
+            <!-- See https://www.yarp.it/latest/classControlBoard__nws__yarp.html for parameter documentation -->
+            <param name="name"> ${portprefix}/body </param>
+            <param name="period"> 0.01 </param>
+            <action phase="startup" level="5" type="attach">
+                <!-- This is the same name that we specified with the name attribute of the device element of a previously created device -->
+                <param name="device"> fake_motor_device </param>
+            </action>
+            <action phase="shutdown" level="5" type="detach" />
+        </device>
+    </devices>
+</robot>
+
+\endcode
+
+This configuration files create two devices:
+  * One `fake_motor_device`, that creates a fake motor control board.
+  * One `fake_motor_nws_yarp`, that creates a Network Wrapper Server (NWS) that exposes `fake_motor_device` functionality over YARP ports.
+
+\section yarp_config_file_reference Reference documentation of XML format.
+
+\subsection robot_element robot Element
+
+The `robot` element is the root element of the XML file. It contains the following attributes:
+* `name`: The name of the `robotinterface` instance.
+* `portprefix`: The portprefix to be used by the port created by the `robotinterface` instance. It can be used as `${portprefix}` when specifying a parameter. It must start with a `/`.
+* `build`: Not used.
+
+\subsection devices_element devices Element
+
+The `devices` element is a child element of `robot` element.
+
+It is a collector of YARP devices that are spawned by the `robotinterface` instance.
+
+\subsection device_element device Element
+
+The `device` element is a child element of `devices` element.
+
+It is used to specify a YARP device that is spawned by the `robotinterface`. It contains the following attributes:
+* `name`: The name of the specific instance of YARP device that is created.
+* `type`: The name of the type of YARP device to instantiate.
+
+\subsection group_element group Element
+
+The `group` element is a child element of `device` or `action` element.
+
+It is a collector of parameters under a specific group name.
+
+\subsection param_element param Element
+
+The `param` element is a child element of `device`, `action` or `group` element.
+
+This element it is used to specify a specific configuration parameter. It contain the following attributes:
+* `name`: The name (i.e. key) of the attribute.
+
+The inner text of the element represents the **value** of the parameter.
+If the  inner text contains the string ${portprefix}, it will be substituted with the portprefix parameter specified
+in the `portprefix` attribute of the `robot` element.
+
+
+\subsection action_element action Element
+
+This element still needs to be documented.
+
+\section yarp_robotinterface_xml_config_files_advanced Inclusion of multiple XML files
+
+Here is an example of .xml config file which includes other xml files, using the `xi:include` tag:
+
+\code
+
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE robot PUBLIC "-//YARP//DTD yarprobotinterface 3.0//EN" "http://www.yarp.it/DTD/yarprobotinterfaceV3.0.dtd">
+
+<robot name="exampleV2" build="1" portprefix="cer" xmlns:xi="http://www.w3.org/2001/XInclude">
+    <devices>
+    <xi:include href="wrappers/odometry/odometry_nws_yarp.xml" disabled_by="disable_odometry" /> 
+    <xi:include href="wrappers/odometry/odometry_nws_ros.xml" enabled_by="enable_ros" disabled_by="disable_odometry" /> 
+    <xi:include href="wrappers/odometry/odometry_nws_ros2.xml" enabled_by="enable_ros2" disabled_by="disable_odometry" /> 
+    <xi:include href="hardware/odometry/odometry.xml" disabled_by="disable_odometry" />
+    <xi:include href="hardware/body/body_nws_yarp.xml" disabled_by="disable_body" />
+    <xi:include href="wrappers/body/body.xml" disabled_by="disable_body" />
+    </devices>
+</robot>
+
+\endcode
+
+Contents of the file "wrappers/odometry/odometry_nws_yarp.xml".
+
+\code
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE devices PUBLIC "-//YARP//DTD yarprobotinterface 3.0//EN" "http://www.yarp.it/DTD/yarprobotinterfaceV3.0.dtd">
+
+<device xmlns:xi="http://www.w3.org/2001/XInclude" name="cer_odometry_nws_yarp" type="odometry2D_nws_yarp">
+    <param name="odometry_port_name">  /cer/odometry </param>
+    <param name="odometer_port_name">  /cer/odometer </param>
+    <param name="velocity_port_name">  /cer/velocity </param>
+    
+    <action phase="startup" level="15" type="attach">
+            <param name="device">  cer_odometry </param>
+    </action>
+    <action phase="shutdown" level="5" type="detach" />
+</device>
+\endcode
+
+It must be noticed that the included file contains just a single `device` section, that will be incorporated inside the
+`devices` block in the parent file. In this way, it is possible to better organize the xml file and eventually add/remove/replace
+ individual devices.
+Additionally each device included through a xi:include can be enabled/disabled by the the use of `enabled_by` and `disabled_by` attributes.
+By default, if no attribute is added, than the file is automatically included.
+If a `enabled_by` attribute is found, then the include line is not enabled by default and it is enabled only if yarprobotinterface
+has been executed with the option `--enable_tags (xxx)` (xxx should match the contents of the `enabled_by` attribute)
+If a `disabled_by` attribute is found, then the include line (either enabled by default or by an `enable_by` attribute ) can
+be disabled if yarprobotinterface has been executed with the specific option `--disable_tags (yyy)` (yyy should match the contetes of the `disabled_by` attribute) 
+
+Examples:
+- `yarprobotinterface` starts yarprobotinterface including the following devices: odometry_nws_yarp.xml odometry.xml body.xml body_nws_yarp.xml
+- `yarprobotinterface --disable_tags (disable_odometry)` starts yarprobotinterface including the following devices: body.xml body_nws_yarp.xml
+- `yarprobotinterface --enable_tags (enable_ros) --disable_tags (disable_body)` starts yarprobotinterface including the following devices: odometry_nws_yarp.xml odometry.xml odometry_nws_ros.xml
+- `yarprobotinterface --enable_tags (enable_ros enable_ros2) --disable_tags (disable_body)` starts yarprobotinterface including the following devices: odometry_nws_yarp.xml odometry.xml odometry_nws_ros.xml odometry_nws_ros2.xml
+- `yarprobotinterface --enable_tags (enable_all)` starts yarprobotinterface including the following devices: odometry_nws_yarp.xml odometry.xml odometry_nws_ros.xml odometry_nws_ros2.xml body.xml body_nws_yarp.xml
+- `yarprobotinterface --enable_tags (enable_all) --disable_tags (disable_body)` starts yarprobotinterface including the following devices: odometry_nws_yarp.xml odometry.xml odometry_nws_ros.xml odometry_nws_ros2.xml
+
+The latter two examples show the use of the special `enable_all` tag, which can be used to enable all optional devices (i.e. marked by a `enabled_by` attribute)
+
+N.B. The `disable_tags` is always processed after the `enable_tags` and can be used to remove previously enabled devices.
+The enabled_by/disabled_by attributes are parsed by the yarprobotinterface pre-processor, hence they can be used only in combination with a xi:include tag.
+*/

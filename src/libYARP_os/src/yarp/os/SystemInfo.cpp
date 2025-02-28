@@ -772,7 +772,7 @@ SystemInfo::LoadInfo SystemInfo::getLoadInfo()
     FILE* procload = fopen("/proc/loadavg", "r");
     if (procload != nullptr) {
         char buff[128];
-        int ret = fscanf(procload, "%lf %lf %lf %s", &(load.cpuLoad1), &(load.cpuLoad5), &(load.cpuLoad15), buff);
+        int ret = fscanf(procload, "%lf %lf %lf %127s", &(load.cpuLoad1), &(load.cpuLoad5), &(load.cpuLoad15), buff);
         if (ret > 0) {
             char* tail = strchr(buff, '/');
             if ((tail != nullptr) && (tail != buff)) {
@@ -871,10 +871,16 @@ SystemInfo::ProcessInfo SystemInfo::getProcessInfo(int pid)
     hr = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID*)&WbemLocator);
     if (WbemLocator != nullptr) {
         //connect to the WMI
-        hr = WbemLocator->ConnectServer(L"ROOT\\CIMV2", nullptr, nullptr, 0, 0, 0, 0, &WbemServices);
+        BSTR val1 = SysAllocString(L"ROOT\\CimV2");
+        hr = WbemLocator->ConnectServer(val1, nullptr, nullptr, 0, 0, 0, 0, &WbemServices);
+        SysFreeString(val1);
         if (WbemServices != nullptr) {
             //Run the WQL Query
-            hr = WbemServices->ExecQuery(L"WQL", L"SELECT ProcessId, CommandLine FROM Win32_Process", WBEM_FLAG_FORWARD_ONLY, nullptr, &EnumWbem);
+            BSTR val2 = SysAllocString(L"WQL");
+            BSTR val3 = SysAllocString(L"SELECT ProcessId, CommandLine FROM Win32_Process");
+            hr = WbemServices->ExecQuery(val2, val3, WBEM_FLAG_FORWARD_ONLY, nullptr, &EnumWbem);
+            SysFreeString(val2);
+            SysFreeString(val3);
             // Iterate over the enumerator
             if (EnumWbem != nullptr) {
                 IWbemClassObject* result = nullptr;

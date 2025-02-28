@@ -11,6 +11,7 @@
 
 using namespace yarp::os;
 using namespace yarp::dev;
+using namespace yarp::sig;
 
 constexpr double c_sleep_time=0.005;
 
@@ -25,7 +26,7 @@ YARP_LOG_COMPONENT(AUDIORECORDER_BASE, "yarp.devices.AudioRecorderDeviceBase")
 #define DEFAULT_NUM_CHANNELS    (2)
 #define DEFAULT_SAMPLE_SIZE     (2)
 
-bool AudioRecorderDeviceBase::getSound(yarp::sig::Sound& sound, size_t min_number_of_samples, size_t max_number_of_samples, double max_samples_timeout_s)
+ReturnValue AudioRecorderDeviceBase::getSound(yarp::sig::Sound& sound, size_t min_number_of_samples, size_t max_number_of_samples, double max_samples_timeout_s)
 {
     //check for something_to_record
     {
@@ -55,7 +56,7 @@ bool AudioRecorderDeviceBase::getSound(yarp::sig::Sound& sound, size_t min_numbe
     if (max_number_of_samples < min_number_of_samples)
     {
         yCError(AUDIORECORDER_BASE) << "max_number_of_samples must be greater than min_number_of_samples!";
-        return false;
+        return ReturnValue::return_code::return_value_error_method_failed;
     }
     if (max_number_of_samples > this->m_audiorecorder_cfg.numSamples)
     {
@@ -87,7 +88,7 @@ bool AudioRecorderDeviceBase::getSound(yarp::sig::Sound& sound, size_t min_numbe
     if (samples_to_be_copied > max_number_of_samples) {
         samples_to_be_copied = max_number_of_samples;
     }
-    if (sound.getChannels() != this->m_audiorecorder_cfg.numChannels && sound.getSamples() != samples_to_be_copied)
+    if (sound.getChannels() != this->m_audiorecorder_cfg.numChannels || sound.getSamples() != samples_to_be_copied)
     {
         sound.resize(samples_to_be_copied, this->m_audiorecorder_cfg.numChannels);
     }
@@ -119,59 +120,60 @@ bool AudioRecorderDeviceBase::getSound(yarp::sig::Sound& sound, size_t min_numbe
     double ct2 = yarp::os::Time::now();
     yCDebug(AUDIORECORDER_BASE) << ct2 - ct1;
     #endif
-    return true;
+    return ReturnValue_ok;
 }
 
-bool AudioRecorderDeviceBase::getRecordingAudioBufferMaxSize(yarp::dev::AudioBufferSize& size)
+ReturnValue AudioRecorderDeviceBase::getRecordingAudioBufferMaxSize(yarp::sig::AudioBufferSize& size)
 {
     if (m_inputBuffer == nullptr)
     {
         yCError(AUDIORECORDER_BASE) << "getRecordingAudioBufferMaxSize() called, but no audio buffer is allocated yet";
-        return false;
+        return ReturnValue::return_code::return_value_error_not_ready;
     }
     //no lock guard is needed here
     size = this->m_inputBuffer->getMaxSize();
-    return true;
+    return ReturnValue_ok;
 }
 
 
-bool AudioRecorderDeviceBase::getRecordingAudioBufferCurrentSize(yarp::dev::AudioBufferSize& size)
+ReturnValue AudioRecorderDeviceBase::getRecordingAudioBufferCurrentSize(yarp::sig::AudioBufferSize& size)
 {
     if (m_inputBuffer == nullptr)
     {
         yCError(AUDIORECORDER_BASE) << "getRecordingAudioBufferCurrentSize() called, but no audio buffer is allocated yet";
-        return false;
+        return ReturnValue::return_code::return_value_error_not_ready;
     }
     //no lock guard is needed here
     size = this->m_inputBuffer->size();
-    return true;
+    return ReturnValue_ok;
 }
 
-bool AudioRecorderDeviceBase::setSWGain(double gain)
+ReturnValue AudioRecorderDeviceBase::setSWGain(double gain)
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     if (gain > 0)
     {
         m_sw_gain = gain;
-        return true;
+        return ReturnValue_ok;
     }
-    return false;
+    //negative gain
+    return ReturnValue::return_code::return_value_error_method_failed;
 }
 
-bool AudioRecorderDeviceBase::resetRecordingAudioBuffer()
+ReturnValue AudioRecorderDeviceBase::resetRecordingAudioBuffer()
 {
     if (m_inputBuffer == nullptr)
     {
         yCError(AUDIORECORDER_BASE) << "resetRecordingAudioBuffer() called, but no audio buffer is allocated yet";
-        return false;
+        return ReturnValue::return_code::return_value_error_not_ready;
     }
     std::lock_guard<std::mutex> lock(m_mutex);
     m_inputBuffer->clear();
     yCDebug(AUDIORECORDER_BASE) << "resetRecordingAudioBuffer";
-    return true;
+    return ReturnValue_ok;
 }
 
-bool AudioRecorderDeviceBase::startRecording()
+ReturnValue AudioRecorderDeviceBase::startRecording()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_recording_enabled = true;
@@ -180,10 +182,10 @@ bool AudioRecorderDeviceBase::startRecording()
         this->m_inputBuffer->clear();
     }
     yCInfo(AUDIORECORDER_BASE) << "Recording started";
-    return true;
+    return ReturnValue_ok;
 }
 
-bool AudioRecorderDeviceBase::stopRecording()
+ReturnValue AudioRecorderDeviceBase::stopRecording()
 {
     std::lock_guard<std::mutex> lock(m_mutex);
     m_recording_enabled = false;
@@ -194,22 +196,28 @@ bool AudioRecorderDeviceBase::stopRecording()
         //this->m_inputBuffer->clear();
     }
     yCInfo(AUDIORECORDER_BASE) << "Recording stopped";
-    return true;
+    return ReturnValue_ok;
 }
 
-bool AudioRecorderDeviceBase::isRecording(bool& recording_enabled)
+ReturnValue AudioRecorderDeviceBase::isRecording(bool& recording_enabled)
 {
     recording_enabled = m_recording_enabled;
-    return true;
+    return ReturnValue_ok;
 }
 
 AudioRecorderDeviceBase::~AudioRecorderDeviceBase()
 {
-    delete m_inputBuffer;
+    if (m_inputBuffer != nullptr)
+    {
+        delete m_inputBuffer;
+        m_inputBuffer = nullptr;
+    }
 }
 
 bool AudioRecorderDeviceBase::configureRecorderAudioDevice(yarp::os::Searchable& config, std::string device_name)
 {
+    std::string debug_cfg_string = config.toString();
+
     m_audiorecorder_cfg.frequency = config.check("rate", Value(0), "audio sample rate (0=automatic)").asInt32();
     m_audiorecorder_cfg.numSamples = config.check("samples", Value(0), "number of samples per network packet (0=automatic). For chunks of 1 second of recording set samples=rate. Channels number is handled internally.").asInt32();
     m_audiorecorder_cfg.numChannels = config.check("channels", Value(0), "number of audio channels (0=automatic, max is 2)").asInt32();

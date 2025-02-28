@@ -118,11 +118,12 @@ endif()
 
 option(BUILD_SHARED_LIBS "Compile shared libraries rather than linking statically" ON)
 mark_as_advanced(BUILD_SHARED_LIBS)
-yarp_renamed_option(CREATE_SHARED_LIBRARY BUILD_SHARED_LIBS) # Since YARP 2.3.68.1
 
 set(YARP_DLL OFF)
 if(BUILD_SHARED_LIBS)
   set(YARP_DLL ON)
+else()
+  add_definitions("-DYARP_IS_STATIC")
 endif()
 
 set (YARP_LINK_PLUGINS TRUE)
@@ -163,13 +164,24 @@ endif()
 
 cmake_dependent_option(YARP_DISABLE_FAILING_TESTS OFF "Disable tests that fail randomly due to race conditions" YARP_COMPILE_TESTS OFF)
 mark_as_advanced(YARP_DISABLE_FAILING_TESTS)
+if(YARP_DISABLE_FAILING_TESTS)
+  add_definitions(-DDISABLE_FAILING_TESTS)
+endif()
+
+cmake_dependent_option(YARP_DISABLE_FAILING_VALGRIND_TESTS OFF "Disable tests on which valgrind detects issues" YARP_COMPILE_TESTS OFF)
+mark_as_advanced(YARP_DISABLE_FAILING_VALGRIND_TESTS)
+if(YARP_DISABLE_FAILING_VALGRIND_TESTS)
+  add_definitions(-DDISABLE_FAILING_VALGRIND_TESTS)
+endif()
 
 cmake_dependent_option(YARP_ENABLE_BROKEN_TESTS OFF "Enable broken tests" YARP_COMPILE_TESTS OFF)
 mark_as_advanced(YARP_ENABLE_BROKEN_TESTS)
+if(YARP_ENABLE_BROKEN_TESTS)
+  add_definitions(-DENABLE_BROKEN_TESTS)
+endif()
 
 cmake_dependent_option(YARP_ENABLE_INTEGRATION_TESTS OFF "Run integration tests" "YARP_COMPILE_TESTS;UNIX" OFF)
 mark_as_advanced(YARP_ENABLE_INTEGRATION_TESTS)
-yarp_renamed_option(YARP_TEST_INTEGRATION YARP_ENABLE_INTEGRATION_TESTS) # since YARP 3.2.0
 
 cmake_dependent_option(YARP_ENABLE_EXAMPLES_AS_TESTS OFF "Compile examples as unit tests" YARP_COMPILE_TESTS OFF)
 mark_as_advanced(YARP_ENABLE_EXAMPLES_AS_TESTS)
@@ -194,6 +206,9 @@ cmake_dependent_option(
   "YARP_COMPILE_TESTS" OFF
 )
 mark_as_advanced(YARP_VALGRIND_TESTS)
+if(YARP_VALGRIND_TESTS)
+  add_definitions(-DWITH_VALGRIND)
+endif()
 
 if(YARP_VALGRIND_TESTS)
   find_program(VALGRIND_EXECUTABLE NAMES valgrind)
@@ -211,7 +226,7 @@ if(YARP_VALGRIND_TESTS)
 endif()
 
 unset(YARP_TEST_LAUNCHER)
-set(YARP_TEST_TIMEOUT_DEFAULT_VALGRIND 300)
+set(YARP_TEST_TIMEOUT_DEFAULT_VALGRIND 600)
 if(DEFINED VALGRIND_COMMAND)
   set(YARP_TEST_LAUNCHER ${VALGRIND_COMMAND})
   # The default timeout is not enough when running under valgrind

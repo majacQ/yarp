@@ -18,6 +18,7 @@
 
 using namespace yarp::os;
 using namespace yarp::dev;
+using namespace yarp::sig;
 
 #define SLEEP_TIME 0.005f
 
@@ -219,7 +220,7 @@ bool PortAudioDeviceDriver::open(yarp::os::Searchable& config)
     m_driverConfig.recChannels = config.check("channels", Value(0), "number of audio channels (0=automatic, max is 2)").asInt32();
     m_driverConfig.wantRead = (bool)config.check("read","if present, just deal with reading audio (microphone)");
     m_driverConfig.wantWrite = (bool)config.check("write","if present, just deal with writing audio (speaker)");
-    m_driverConfig.deviceNumber = config.check("id",Value(-1),"which portaudio index to use (-1=automatic)").asInt32();
+    m_driverConfig.deviceNumber = config.check("dev_id",Value(-1),"which portaudio index to use (-1=automatic)").asInt32();
 
     if (!(m_driverConfig.wantRead|| m_driverConfig.wantWrite))
     {
@@ -618,13 +619,13 @@ bool PortAudioDeviceDriver::appendSound(const yarp::sig::Sound& sound)
     return true;
 }
 
-bool PortAudioDeviceDriver::getPlaybackAudioBufferCurrentSize(yarp::dev::AudioBufferSize& size)
+bool PortAudioDeviceDriver::getPlaybackAudioBufferCurrentSize(yarp::sig::AudioBufferSize& size)
 {
     size = this->dataBuffers.playData->size();
     return true;
 }
 
-bool PortAudioDeviceDriver::getPlaybackAudioBufferMaxSize(yarp::dev::AudioBufferSize& size)
+bool PortAudioDeviceDriver::getPlaybackAudioBufferMaxSize(yarp::sig::AudioBufferSize& size)
 {
     size = this->dataBuffers.playData->getMaxSize();
     return true;
@@ -636,13 +637,13 @@ bool PortAudioDeviceDriver::resetPlaybackAudioBuffer()
     return true;
 }
 
-bool PortAudioDeviceDriver::getRecordingAudioBufferCurrentSize(yarp::dev::AudioBufferSize& size)
+bool PortAudioDeviceDriver::getRecordingAudioBufferCurrentSize(yarp::sig::AudioBufferSize& size)
 {
     size = this->dataBuffers.recData->size();
     return true;
 }
 
-bool PortAudioDeviceDriver::getRecordingAudioBufferMaxSize(yarp::dev::AudioBufferSize& size)
+bool PortAudioDeviceDriver::getRecordingAudioBufferMaxSize(yarp::sig::AudioBufferSize& size)
 {
     size = this->dataBuffers.recData->getMaxSize();
     return true;

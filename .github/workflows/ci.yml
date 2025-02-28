@@ -16,7 +16,7 @@ jobs:
 
   select_environment:
     name: 'Prepare Environment'
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     outputs:
       timestamp: ${{ steps.select.outputs.timestamp }}
       repository_owner: ${{ steps.select.outputs.repository_owner }}
@@ -33,31 +33,31 @@ jobs:
     - name: "Set output variables"
       id: select
       run: |
-        echo "::set-output name=timestamp::$(/bin/date -u +%Y%m%d-%H%M%S)"
+        echo "timestamp=$(/bin/date -u +%Y%m%d-%H%M%S)" >> $GITHUB_OUTPUT
 
-        echo "::set-output name=repository_owner::${{ github.repository_owner }}
-        echo "::set-output name=repository_name::$(cat $GITHUB_EVENT_PATH | jq -r .repository.name)
-        echo "::set-output name=repository::${{ github.repository }}"
+        echo "repository_owner=${{ github.repository_owner }}" >> $GITHUB_OUTPUT
+        echo "repository_name=$(cat $GITHUB_EVENT_PATH | jq -r .repository.name)" >> $GITHUB_OUTPUT
+        echo "repository=${{ github.repository }}" >> $GITHUB_OUTPUT
 
         if [[ "$GITHUB_EVENT_NAME" = "pull_request_target" ]]; then
-          echo "::set-output name=environment::code-analysis_unsafe"
-          echo "::set-output name=ref::refs/pull/$(cat $GITHUB_EVENT_PATH | jq -r .number)/merge"
+          echo "environment=code-analysis_unsafe" >> $GITHUB_OUTPUT
+          echo "ref=refs/pull/$(cat $GITHUB_EVENT_PATH | jq -r .number)/merge" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=environment::code-analysis"
-          echo "::set-output name=ref::${{ github.ref }}"
+          echo "environment=code-analysis" >> $GITHUB_OUTPUT
+          echo "ref=${{ github.ref }}" >> $GITHUB_OUTPUT
         fi
         if [[ "$GITHUB_EVENT_NAME" = "pull_request" || "$GITHUB_EVENT_NAME" == "pull_request_target" ]]; then
-          echo "::set-output name=sha::${{ github.event.pull_request.head.sha }}"
-          echo "::set-output name=head_ref::${GITHUB_HEAD_REF}"
-          echo "::set-output name=base_ref::${GITHUB_BASE_REF}"
-          echo "::set-output name=pr_number::$(cat $GITHUB_EVENT_PATH | jq -r .number)"
+          echo "sha=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+          echo "head_ref=${GITHUB_HEAD_REF}" >> $GITHUB_OUTPUT
+          echo "base_ref=${GITHUB_BASE_REF}" >> $GITHUB_OUTPUT
+          echo "pr_number=$(cat $GITHUB_EVENT_PATH | jq -r .number)" >> $GITHUB_OUTPUT
         else
-          echo "::set-output name=sha::${{ github.sha }}"
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
         fi
 
         # Get YARP Project Version
         if [[ "$GITHUB_EVENT_NAME" = "release" ]]; then
-          echo "::set-output name=yarp_version::$(awk '/ VERSION /{print $2}' CMakeLists.txt)"
+          echo "yarp_version=$(awk '/ VERSION /{print $2}' CMakeLists.txt)" >> $GITHUB_OUTPUT
         fi
 
     - name: 'Debug output variables'
@@ -102,10 +102,10 @@ jobs:
   check-license:
     name: 'Check License'
     needs: select_environment
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
@@ -123,10 +123,10 @@ jobs:
   check-style:
     name: 'Check Style'
     needs: select_environment
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
@@ -141,65 +141,127 @@ jobs:
         tests/misc/check_style.pl
 
 
+  check-tests:
+    name: 'Check Devices Tests'
+    needs: select_environment
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Clone repository
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ needs.select_environment.outputs.repository }}
+        ref: ${{ needs.select_environment.outputs.ref }}
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -qq -y python3
+
+    - name: Check Devices Tests
+      run: |
+        python3 tests/misc/check_tests.py
+
+
   run-cmake:
     name: 'Run CMake [CMake ${{ matrix.config.cmake_version }} (${{ matrix.config.cmake_generator }}), YCM ${{ matrix.config.ycm_version }}]'
     needs: [select_environment, check-license, check-style]
-    runs-on: ubuntu-20.04
-    container:
-      image: ghcr.io/robotology/ycm:cmake-${{ matrix.config.cmake_version }}_ycm-${{ matrix.config.ycm_version }}
+    runs-on: ubuntu-22.04
     strategy:
       fail-fast: false
       matrix:
         config:
         - {
-            cmake_version: "3.16",
+            cmake_version: "3.19.*",
             cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
+            ycm_version: "0.15.3",
           }
         - {
-            cmake_version: "3.17",
+            cmake_version: "3.20.*",
             cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
+            ycm_version: "0.15.3",
           }
         - {
-            cmake_version: "3.18",
-            cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
-          }
-        - {
-            cmake_version: "3.19",
-            cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
-          }
-        - {
-            cmake_version: "3.20",
-            cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
-          }
-        - {
-            cmake_version: "3.20",
+            cmake_version: "3.20.*",
             cmake_generator: "Ninja",
-            ycm_version: "0.13.0",
+            ycm_version: "0.15.3",
           }
         - {
-            cmake_version: "3.21",
+            cmake_version: "3.21.*",
             cmake_generator: "Unix Makefiles",
-            ycm_version: "0.13.0",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.22.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.23.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.24.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.25.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.26.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.27.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
+          }
+        - {
+            cmake_version: "3.28.*",
+            cmake_generator: "Unix Makefiles",
+            ycm_version: "0.15.3",
           }
     steps:
-    - name: Clone repository
-      uses: actions/checkout@v2
-      with:
-        repository: ${{ needs.select_environment.outputs.repository }}
-        ref: ${{ needs.select_environment.outputs.ref }}
+    - name: remove any previous installation of cmake
+      run: | 
+        sudo rm /usr/local/bin/cmake
+        
+    - name: install cmake
+      run: |
+        wget -O - https://apt.kitware.com/keys/kitware-archive-latest.asc 2>/dev/null | gpg --dearmor - | sudo tee /usr/share/keyrings/kitware-archive-keyring.gpg >/dev/null
+        echo 'deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ focal main' | sudo tee /etc/apt/sources.list.d/kitware.list >/dev/null
+        sudo apt-get update
+        sudo rm /usr/share/keyrings/kitware-archive-keyring.gpg
+        sudo apt-get -y install kitware-archive-keyring
+        sudo apt-cache policy cmake-data
+        sudo apt-cache policy cmake
+        sudo apt-get -y install cmake-data=${{matrix.config.cmake_version}}
+        sudo apt-get -y -f install cmake=${{matrix.config.cmake_version}}
 
     - name: Print CMake version
       run: |
+        which cmake
         cmake --version
+        /usr/bin/cmake --version
+
+    - name: Get YCM package
+      run: |
+        wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.deb
+        sudo dpkg -i ycm-cmake-modules-0.15.3-all.deb
 
     - name: Print YCM version
       run: |
         grep YCM_VERSION /usr/share/cmake/YCM/YCMConfig.cmake
+
+    - name: Clone Yarp repository
+      uses: actions/checkout@v3
+      with:
+        repository: ${{ needs.select_environment.outputs.repository }}
+        ref: ${{ needs.select_environment.outputs.ref }}
 
     - name: Run CMake
       run: |
@@ -218,7 +280,7 @@ jobs:
         config:
         - {
             id: '01',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -228,10 +290,10 @@ jobs:
           }
         - {
             id: '02',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             test_external_bindings: true,
@@ -239,7 +301,7 @@ jobs:
         - {
             id: '03',
             description: 'No ACE',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -252,10 +314,10 @@ jobs:
         - {
             id: '04',
             description: 'No ACE',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
@@ -265,7 +327,7 @@ jobs:
         - {
             id: '05',
             description: 'No YARP_math (bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -279,10 +341,10 @@ jobs:
         - {
             id: '06',
             description: 'No YARP_math (bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_Eigen:BOOL=ON
@@ -293,7 +355,7 @@ jobs:
         - {
             id: '07',
             description: 'CLEAN_API (unit tests and bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -306,10 +368,10 @@ jobs:
         - {
             id: '08',
             description: 'CLEAN_API (unit tests and bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DYARP_CLEAN_API:BOOL=ON
@@ -319,31 +381,29 @@ jobs:
         - {
             id: '09',
             description: 'Static',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
-            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON", # FIXME Enable when YCM 0.14 is available
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF",
           }
         - {
             id: '10',
             description: 'Static',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
-            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON", # FIXME Enable when YCM 0.14 is available
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF",
           }
         - {
             id: '11',
             description: 'Static, no ACE (bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -352,28 +412,26 @@ jobs:
             cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
                                   -DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
                                   -DSKIP_ACE:BOOL=ON
-                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON", # FIXME Enable when YCM 0.14 is available
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
           }
         - {
             id: '12',
             description: 'Static, no ACE (bindings disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
                                   -DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
                                   -DSKIP_ACE:BOOL=ON
-                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON", # FIXME Enable when YCM 0.14 is available
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
           }
         - {
             id: '13',
             description: 'No deprecated',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -384,10 +442,10 @@ jobs:
         - {
             id: '14',
             description: 'No deprecated',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DYARP_NO_DEPRECATED:BOOL=ON",
@@ -395,7 +453,7 @@ jobs:
         - {
             id: '15',
             description: 'No executables (unit tests disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -407,10 +465,10 @@ jobs:
         - {
             id: '16',
             description: 'No executables (unit tests disabled)',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DYARP_COMPILE_EXECUTABLES:BOOL=OFF
@@ -419,7 +477,7 @@ jobs:
         - {
             id: '17',
             description: 'Build extern dependencies',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -432,10 +490,10 @@ jobs:
         - {
             id: '18',
             description: 'Build extern dependencies',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
             cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_SQLite:BOOL=ON
@@ -444,7 +502,7 @@ jobs:
           }
         - {
             id: '19',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
             cc: "gcc",
             cxx: "g++",
@@ -453,78 +511,394 @@ jobs:
           }
         - {
             id: '20',
-            os: ubuntu-20.04,
+            os: ubuntu-22.04,
             build_type: "Release",
-            cc: "clang",
-            cxx: "clang++",
+            cc: "clang-17",
+            cxx: "clang++-17",
             cmake_generator: "Ninja",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
           }
         - {
             id: '21',
-            description: 'Valgrind (bindings, failing tests and examples as tests disabled)',
-            os: ubuntu-20.04,
+            description: 'Valgrind (bindings, failing tests, guis and examples as tests disabled)',
+            os: ubuntu-22.04,
             build_type: "Debug",
             cc: "gcc",
             cxx: "g++",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
-            # These devices link to glib/gobject causing some memory leak on
-            # valgrind, therefore they are not enabled on valgrind builds
             cmake_extra_options: "-DYARP_VALGRIND_TESTS:BOOL=ON
                                   -DYARP_DISABLE_FAILING_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_VALGRIND_TESTS:BOOL=ON
                                   -DYARP_ENABLE_EXAMPLES_AS_TESTS:BOOL=OFF
                                   -DYARP_COMPILE_BINDINGS:BOOL=OFF
                                   -DCMAKE_DISABLE_FIND_PACKAGE_FFMPEG=ON
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON
-                                  -DENABLE_yarpcar_h264:BOOL=OFF
-                                  -DENABLE_yarpcar_mjpeg:BOOL=OFF
-                                  -DENABLE_yarppm_image_compression_ffmpeg:BOOL=OFF
+                                  -DYARP_COMPILE_GUIS:BOOL=OFF
                                   -DENABLE_yarpmod_usbCamera:BOOL=OFF
                                   -DENABLE_yarpmod_usbCameraRaw:BOOL=OFF
-                                  -DENABLE_yarpmod_ffmpeg_grabber:BOOL=OFF
-                                  -DENABLE_yarpmod_ffmpeg_writer:BOOL=OFF
                                   -DENABLE_yarpmod_portaudio:BOOL=OFF
                                   -DENABLE_yarpmod_portaudioPlayer:BOOL=OFF
                                   -DENABLE_yarpmod_portaudioRecorder:BOOL=OFF
-                                  -DENABLE_yarpmod_fakeMicrophone:BOOL=OFF
                                   -DENABLE_yarpmod_opencv_grabber:BOOL=OFF",
           }
         - {
             id: '22',
-            description: 'Valgrind, No ACE (bindings, failing tests and examples as tests disabled)',
-            os: ubuntu-20.04,
+            description: 'Valgrind, No ACE (bindings, failing tests, guis and examples as tests disabled)',
+            os: ubuntu-22.04,
             build_type: "Debug",
             cc: "gcc",
             cxx: "g++",
             cmake_generator: "Unix Makefiles",
             cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
-            # These devices link to glib/gobject causing some memory leak on
-            # valgrind, therefore they are not enabled on valgrind builds
             cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
                                   -DSKIP_ACE:BOOL=ON
                                   -DYARP_VALGRIND_TESTS:BOOL=ON
                                   -DYARP_DISABLE_FAILING_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_VALGRIND_TESTS:BOOL=ON
                                   -DYARP_ENABLE_EXAMPLES_AS_TESTS:BOOL=OFF
                                   -DYARP_COMPILE_BINDINGS:BOOL=OFF
                                   -DCMAKE_DISABLE_FIND_PACKAGE_FFMPEG=ON
-                                  -DCMAKE_DISABLE_FIND_PACKAGE_SOXR=ON
-                                  -DENABLE_yarpcar_h264:BOOL=OFF
-                                  -DENABLE_yarpcar_mjpeg:BOOL=OFF
-                                  -DENABLE_yarppm_image_compression_ffmpeg:BOOL=OFF
+                                  -DYARP_COMPILE_GUIS:BOOL=OFF
                                   -DENABLE_yarpmod_usbCamera:BOOL=OFF
                                   -DENABLE_yarpmod_usbCameraRaw:BOOL=OFF
-                                  -DENABLE_yarpmod_ffmpeg_grabber:BOOL=OFF
-                                  -DENABLE_yarpmod_ffmpeg_writer:BOOL=OFF
                                   -DENABLE_yarpmod_portaudio:BOOL=OFF
                                   -DENABLE_yarpmod_portaudioPlayer:BOOL=OFF
                                   -DENABLE_yarpmod_portaudioRecorder:BOOL=OFF
-                                  -DENABLE_yarpmod_fakeMicrophone:BOOL=OFF
                                   -DENABLE_yarpmod_opencv_grabber:BOOL=OFF",
           }
         - {
-            id: '23',
-            os: windows-latest,
+            id: '101',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            test_external_bindings: true,
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '102',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            test_external_bindings: true,
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '103',
+            description: 'No ACE',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_ACE=ON
+                                  -DSKIP_ACE:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options:  "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+            test_external_bindings: true,
+          }
+        - {
+            id: '104',
+            description: 'No ACE',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
+                                  -DSKIP_ACE:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options:  "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+            test_external_bindings: true,
+          }
+        - {
+            id: '105',
+            description: 'No YARP_math (bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_Eigen:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_GSL:BOOL=ON
+                                  -DYARP_COMPILE_libYARP_math:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '106',
+            description: 'No YARP_math (bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_Eigen:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_GSL:BOOL=ON
+                                  -DYARP_COMPILE_libYARP_math:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '107',
+            description: 'CLEAN_API (unit tests and bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_CLEAN_API:BOOL=ON
+                                  -DYARP_COMPILE_TESTS:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '108',
+            description: 'CLEAN_API (unit tests and bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_CLEAN_API:BOOL=ON
+                                  -DYARP_COMPILE_TESTS:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '109',
+            description: 'Static',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '110',
+            description: 'Static',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '111',
+            description: 'Static, no ACE (bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
+                                  -DSKIP_ACE:BOOL=ON
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '112',
+            description: 'Static, no ACE (bindings disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DBUILD_SHARED_LIBS:BOOL=OFF
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
+                                  -DSKIP_ACE:BOOL=ON
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF",
+          }
+        - {
+            id: '113',
+            description: 'No deprecated',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_NO_DEPRECATED:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '114',
+            description: 'No deprecated',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_NO_DEPRECATED:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '115',
+            description: 'No executables (unit tests disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_COMPILE_EXECUTABLES:BOOL=OFF
+                                  -DYARP_COMPILE_TESTS:BOOL=OFF",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '116',
+            description: 'No executables (unit tests disabled)',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_COMPILE_EXECUTABLES:BOOL=OFF
+                                  -DYARP_COMPILE_TESTS:BOOL=OFF",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '117',
+            description: 'Build extern dependencies',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_SQLite:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_TinyXML:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_QCustomPlot:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '118',
+            description: 'Build extern dependencies',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_SQLite:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_TinyXML:BOOL=ON
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_QCustomPlot:BOOL=ON",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '119',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Ninja",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '120',
+            os: ubuntu-24.04,
+            build_type: "Release",
+            cc: "clang-17",
+            cxx: "clang++-17",
+            cmake_generator: "Ninja",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+            swig_extra_options: "-DSWIG_EXECUTABLE=/usr/bin/swig
+                                  -DSWIG_DIR=/usr/share/swig/4.3.0",
+          }
+        - {
+            id: '121',
+            description: 'Valgrind (bindings, failing tests, guis and examples as tests disabled)',
+            os: ubuntu-24.04,
+            build_type: "Debug",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DYARP_VALGRIND_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_VALGRIND_TESTS:BOOL=ON
+                                  -DYARP_ENABLE_EXAMPLES_AS_TESTS:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_FFMPEG=ON
+                                  -DYARP_COMPILE_GUIS:BOOL=OFF
+                                  -DENABLE_yarpmod_usbCamera:BOOL=OFF
+                                  -DENABLE_yarpmod_usbCameraRaw:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudio:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudioPlayer:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudioRecorder:BOOL=OFF
+                                  -DENABLE_yarpmod_opencv_grabber:BOOL=OFF",
+          }
+        - {
+            id: '122',
+            description: 'Valgrind, No ACE (bindings, failing tests, guis and examples as tests disabled)',
+            os: ubuntu-24.04,
+            build_type: "Debug",
+            cc: "gcc",
+            cxx: "g++",
+            cmake_generator: "Unix Makefiles",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.linux.cmake",
+            cmake_extra_options: "-DCMAKE_DISABLE_FIND_PACKAGE_ACE:BOOL=ON
+                                  -DSKIP_ACE:BOOL=ON
+                                  -DYARP_VALGRIND_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_TESTS:BOOL=ON
+                                  -DYARP_DISABLE_FAILING_VALGRIND_TESTS:BOOL=ON
+                                  -DYARP_ENABLE_EXAMPLES_AS_TESTS:BOOL=OFF
+                                  -DYARP_COMPILE_BINDINGS:BOOL=OFF
+                                  -DCMAKE_DISABLE_FIND_PACKAGE_FFMPEG=ON
+                                  -DYARP_COMPILE_GUIS:BOOL=OFF
+                                  -DENABLE_yarpmod_usbCamera:BOOL=OFF
+                                  -DENABLE_yarpmod_usbCameraRaw:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudio:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudioPlayer:BOOL=OFF
+                                  -DENABLE_yarpmod_portaudioRecorder:BOOL=OFF
+                                  -DENABLE_yarpmod_opencv_grabber:BOOL=OFF",
+          }
+        - {
+            id: '201',
+            os: windows-2019,
             build_type: "Release",
             cc: "cl",
             cxx: "cl",
@@ -536,8 +910,8 @@ jobs:
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
           }
         - {
-            id: '24',
-            os: windows-latest,
+            id: '202',
+            os: windows-2019,
             build_type: "Release",
             cc: "cl",
             cxx: "cl",
@@ -549,8 +923,8 @@ jobs:
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
           }
         - {
-            id: '25',
-            os: windows-latest,
+            id: '203',
+            os: windows-2019,
             build_type: "Release",
             cc: "cl",
             cxx: "cl",
@@ -561,8 +935,8 @@ jobs:
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
           }
         - {
-            id: '26',
-            os: windows-latest,
+            id: '204',
+            os: windows-2019,
             build_type: "Release",
             cc: "cl",
             cxx: "cl",
@@ -573,8 +947,34 @@ jobs:
             environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2019/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
           }
         - {
-            id: '27',
-            os: macos-latest,
+            id: '205',
+            os: windows-2022,
+            build_type: "Release",
+            cc: "cl",
+            cxx: "cl",
+            cmake_generator: "Visual Studio 17 2022",
+            cmake_toolset: "v143",
+            cmake_platform: "x64",
+            cmake_toolchain_file: "C:/robotology/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.windows.cmake",
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
+          }
+        - {
+            id: '206',
+            os: windows-2022,
+            build_type: "Release",
+            cc: "cl",
+            cxx: "cl",
+            cmake_generator: "Visual Studio 17 2022",
+            cmake_toolset: "v142",
+            cmake_platform: "x64",
+            cmake_toolchain_file: "C:/robotology/vcpkg/scripts/buildsystems/vcpkg.cmake",
+            cmake_initial_cache_file: ".ci/initial-cache.gh.windows.cmake",
+            environment_script: "C:/Program Files (x86)/Microsoft Visual Studio/2022/Enterprise/VC/Auxiliary/Build/vcvars64.bat",
+          }
+        - {
+            id: '301',
+            os: macos-13,
             build_type: "Release",
             cc: "clang",
             cxx: "clang++",
@@ -582,8 +982,8 @@ jobs:
             cmake_initial_cache_file: ".ci/initial-cache.gh.macos.cmake",
           }
         - {
-            id: '28',
-            os: macos-latest,
+            id: '302',
+            os: macos-13,
             build_type: "Release",
             cc: "clang",
             cxx: "clang++",
@@ -591,8 +991,8 @@ jobs:
             cmake_initial_cache_file: ".ci/initial-cache.gh.macos.cmake",
           }
         - {
-            id: '29',
-            os: macos-11.0,
+            id: '303',
+            os: macos-14,
             build_type: "Release",
             cc: "clang",
             cxx: "clang++",
@@ -600,8 +1000,8 @@ jobs:
             cmake_initial_cache_file: ".ci/initial-cache.gh.macos.cmake",
           }
         - {
-            id: '30',
-            os: macos-11.0,
+            id: '304',
+            os: macos-14,
             build_type: "Release",
             cc: "clang",
             cxx: "clang++",
@@ -612,13 +1012,13 @@ jobs:
     steps:
 
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
 
     - name: Handle cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           .ccache
@@ -629,25 +1029,41 @@ jobs:
 
     - name: Dependencies [Linux]
       if: runner.os == 'Linux'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
+      shell: bash
+      run: |
+          # Install dep for gstreamer. It must be the first one.
+          sudo apt-get update
+          sudo apt-get install -y      libunwind-dev
+
+          #Install clang 17
+          sudo apt-get purge -y llvm* clang*
+          wget -nv https://apt.llvm.org/llvm.sh
+          sudo chmod +x llvm.sh
+          sudo ./llvm.sh 17
+
           # Install Robotology dependencies from robotology ppa
           sudo apt-add-repository -y ppa:robotology/ppa
-          sudo apt-get install -qq -y ycm-cmake-modules \
-                                      librobottestingframework-dev
+          sudo apt-get install -qq -y librobottestingframework-dev
+          sudo apt-get update
+
+          # Install cmake
+          sudo apt-get install -qq -y cmake
+          which cmake
+          cmake --version
+          /usr/bin/cmake --version
+
+          # Install ycm
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.deb
+          sudo dpkg -i ycm-cmake-modules-0.15.3-all.deb
 
           # Install build tools
-          sudo apt-get install -qq -y cmake \
-                                      ccache \
+          sudo apt-get install -qq -y ccache \
                                       ninja-build \
                                       valgrind
 
-          sudo apt-get install -qq -y libace-dev \
-                                      libsqlite3-dev \
+          sudo apt-get install -y     libace-dev
+
+          sudo apt-get install -y     libsqlite3-dev \
                                       libtinyxml-dev \
                                       libedit-dev \
                                       qtbase5-dev \
@@ -658,8 +1074,6 @@ jobs:
                                       libopencv-dev \
                                       libeigen3-dev \
                                       libgraphviz-dev \
-                                      libgstreamer1.0-dev \
-                                      libgstreamer-plugins-base1.0-dev \
                                       libpng-dev \
                                       libv4l-dev \
                                       libavcodec-dev \
@@ -671,24 +1085,35 @@ jobs:
                                       libopenni2-dev \
                                       libftdi-dev \
                                       libi2c-dev \
-                                      libfuse-dev \
                                       libjpeg-dev \
                                       libpcl-dev \
                                       libsoxr-dev
 
-          # Install SWIG and bindings dependencies
-          sudo apt-get install -qq -y swig \
-                                      mono-mcs \
+          sudo apt-get install -y     libgstreamer1.0-dev \
+                                      libgstreamer-plugins-base1.0-dev
+
+          # Install bindings dependencies
+          sudo apt-get install -qq -y mono-mcs \
                                       liblua5.3-dev \
                                       lua5.3 \
                                       tcl-dev \
                                       tk-dev \
                                       python3-dev \
-                                      liboctave-dev \
-                                      default-jdk \
+                                      octave-dev \
                                       ruby-dev \
                                       ruby \
                                       perl
+
+          # Install SWIG
+          # On Ubuntu 24.04 this corresponds to swig 4.2.0 which is affected by a bug: https://github.com/robotology/yarp/issues/3083
+          # sudo apt-get install -qq -y swig 
+          #
+          # we thus install manually swig 4.3.0
+          sudo apt-get purge -y swig
+          wget -nv https://github.com/robotology/robotology-vcpkg-ports/releases/download/storage/swig_4_3_0_ubuntu_24_04.zip
+          unzip -q swig_4_3_0_ubuntu_24_04.zip
+          sudo mv swig_4_3_0_ubuntu_24_04_install/bin/* /usr/bin
+          sudo mv swig_4_3_0_ubuntu_24_04_install/share/swig /usr/share
 
           # Other tools useful in github actions
           sudo apt-get install -qq -y jq \
@@ -696,10 +1121,6 @@ jobs:
                                       curl \
                                       lcov \
                                       gcovr \
-                                      wget \
-                                      curl \
-                                      clang-11 \
-                                      clang-tidy-11 \
                                       xsltproc \
                                       libxml2-utils \
                                       source-highlight
@@ -709,63 +1130,73 @@ jobs:
 
     - name: Dependencies [Windows]
       if: runner.os == 'Windows'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: >-
-          echo # To avoid spending a huge time compiling vcpkg dependencies, we download a root that comes precompiled with all the ports that we need &
-          choco install --no-progress -y wget 7zip &
-          echo &
-          echo # Download and install SWIG &
-          wget -nv https://sourceforge.net/projects/swig/files/swigwin/swigwin-4.0.2/swigwin-4.0.2.zip -O swigwin.zip &
-          7z x swigwin.zip &
-          mv swigwin-4.0.2/swig.exe swig.exe &
-          echo &
-          echo # To avoid problems with non-relocatable packages, we unzip the archive exactly in the same C:/robotology/vcpkg &
-          that has been used to create the pre-compiled archive &
-          wget -nv https://github.com/robotology/robotology-superbuild-dependencies-vcpkg/releases/download/v0.6.0/vcpkg-robotology-yarp-only.zip &
-          7z x -oC:\ vcpkg-robotology-yarp-only.zip &
-          echo &
-          echo # Download and install YCM &
-          wget -nv https://github.com/robotology/ycm/releases/download/v0.13.0/YCM-0.13.0-all.tar.gz -O ycm.tar.gz &
-          7z x ycm.tar.gz &
-          7z x -ttar -oC:\robotology ycm.tar &
-          echo &
-          echo # Download and install ccache &
-          wget -nv https://github.com/cristianadam/ccache/releases/download/v3.7.7/Windows.tar.xz -O ccache.tar.xz &
-          7z x ccache.tar.xz &
+      run: |
+          echo "To avoid spending a huge time compiling vcpkg dependencies, we download a root that comes precompiled with all the ports that we need"
+          choco install --no-progress -y wget 7zip
+          echo ""
+          echo " Download and install SWIG"
+          wget -nv https://sourceforge.net/projects/swig/files/swigwin/swigwin-4.3.0/swigwin-4.3.0.zip -O swigwin.zip
+          7z x swigwin.zip
+          mv swigwin-4.3.0/swig.exe swig.exe
+          echo ""
+          echo " To avoid problems with non-relocatable packages, we unzip the archive exactly in the same C:/robotology/vcpkg that has been used to create the pre-compiled archive"
+          wget -nv https://github.com/robotology/robotology-superbuild-dependencies-vcpkg/releases/download/v0.10.1/vcpkg-robotology-yarp-only.zip
+          7z x -oC:\ vcpkg-robotology-yarp-only.zip
+          echo ""
+          echo " Download and install YCM "
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.tar.gz -O ycm.tar.gz
+          7z x ycm.tar.gz
+          7z x -ttar -oC:\robotology ycm.tar
+          echo ""
+          echo " Download and install ccache "
+          wget -nv https://github.com/cristianadam/ccache/releases/download/v3.7.7/Windows.tar.xz -O ccache.tar.xz
+          7z x ccache.tar.xz
           7z x -ttar ccache.tar
 
     - name: Dependencies [macOS]
       if: runner.os == 'macOS'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
-          # Select Xcode version
-          #ls -n /Applications/ | grep Xcode*
-          if [[ "${{ matrix.config.os }}" == "macos-11.0" ]]; then
-            sudo xcode-select -s /Applications/Xcode_12.3.app/Contents/Developer
-          fi
+      run: |
+          # Temporary workaround for https://github.com/actions/setup-python/issues/577
+          rm -f /usr/local/bin/2to3
+          rm -f /usr/local/bin/2to3-3.11
+          rm -f /usr/local/bin/2to3-3.12
+          rm -f /usr/local/bin/idle3
+          rm -f /usr/local/bin/idle3.11
+          rm -f /usr/local/bin/idle3.12
+          rm -f /usr/local/bin/pydoc3
+          rm -f /usr/local/bin/pydoc3.11
+          rm -f /usr/local/bin/pydoc3.12
+          rm -f /usr/local/bin/python3
+          rm -f /usr/local/bin/python3.11
+          rm -f /usr/local/bin/python3.12
+          rm -f /usr/local/bin/python3-config
+          rm -f /usr/local/bin/python3.11-config
+          rm -f /usr/local/bin/python3.12-config
 
-          brew tap robotology/homebrew-formulae
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.tar.gz -O /Users/runner/work/yarp/ycm.tar.gz
+          7z x /Users/runner/work/yarp/ycm.tar.gz -o/Users/runner/work/yarp
+          7z x -ttar /Users/runner/work/yarp/ycm.tar -o/Users/runner/work/yarp
+          
           brew update
           brew install ccache
           brew install ace
           brew install sqlite tinyxml libedit libpng qt5 opencv eigen graphviz libsoxr
-          brew install robotology/formulae/ycm
 
     - name: Prepare Environment Script
       id: prepare_environment_script
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         set(_env_script ${CMAKE_CURRENT_LIST_DIR}/environment_script.cmake)
         file(WRITE "${_env_script}" "")
+
+        # if YCM is installed manually, set YCM_DIR to allow CMake to find it
+        if("${{ runner.os }}" STREQUAL "Windows")
+          file(APPEND "${_env_script}" "set(ENV{YCM_DIR} \"C:\\\\robotology\\\\YCM-0.15.3-all\")\n")
+        elseif("${{ runner.os }}" STREQUAL "macOS")
+          file(APPEND "${_env_script}" "set(ENV{YCM_DIR} \"/Users/runner/work/yarp/YCM-0.15.3-all\")\n")
+        endif()
+
         if("${{ runner.os }}" STREQUAL "Windows" AND NOT "${{ matrix.config.environment_script }}" STREQUAL "")
           execute_process(
               COMMAND "${{ matrix.config.environment_script }}" && set
@@ -784,9 +1215,6 @@ jobs:
 
           # Ninja and other tools are downloaded in $GITHUB_WORKSPACE
           file(APPEND "${_env_script}" "set(ENV{PATH} \"\$ENV{PATH};\$ENV{GITHUB_WORKSPACE}\")\n")
-
-          # YCM is installed manually, set YCM_DIR to allow CMake to find it
-          file(APPEND "${_env_script}" "set(ENV{YCM_DIR} \"C:\\\\robotology\\\\YCM-0.13.0-all\")\n")
 
           # Append vcpkg bin directory to the PATH
           if("${{ matrix.config.build_type }}" STREQUAL "Release")
@@ -809,7 +1237,7 @@ jobs:
         if("${{ matrix.config.cc }}" MATCHES "gcc")
           file(APPEND "${_env_script}" "set(ENV{CFLAGS} -fdiagnostics-color=always)\n")
           file(APPEND "${_env_script}" "set(ENV{CXXFLAGS} -fdiagnostics-color=always)\n")
-        elseif("${{ matrix.config.cc }}" MATCHES "clang")
+        elseif("${{ matrix.config.cc }}" MATCHES "^clang.*")
           file(APPEND "${_env_script}" "set(ENV{CFLAGS} -fcolor-diagnostics)\n")
           file(APPEND "${_env_script}" "set(ENV{CXXFLAGS} -fcolor-diagnostics)\n")
         endif()
@@ -868,19 +1296,19 @@ jobs:
         endfunction()
         ")
 
-        message("::set-output name=environment_script::${_env_script}")
+        file(APPEND "$ENV{GITHUB_OUTPUT}" "environment_script=${_env_script}\n")
 
     - name: Print Environment Script
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         file(READ "${{ steps.prepare_environment_script.outputs.environment_script }}" _out)
         message("${_out}")
 
     - name: Print system information
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         set(_which_cmd which)
@@ -958,7 +1386,7 @@ jobs:
     - name: Configure
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         set(_generator)
@@ -1006,6 +1434,12 @@ jobs:
           set(_cmake_extra_options ${{ matrix.config.cmake_extra_options }})
         endif()
 
+        #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+        set(_swig_extra_options)
+        if(NOT "${{ matrix.config.swig_extra_options }}" STREQUAL "")
+          set(_swig_extra_options ${{ matrix.config.swig_extra_options }})
+        endif()
+
         execute_process_x(
           COMMAND ${CMAKE_COMMAND}
             -S .
@@ -1019,6 +1453,7 @@ jobs:
             ${_install_prefix}
             ${_cmake_compiler_lauchers}
             ${_cmake_extra_options}
+            ${_swig_extra_options}
           RESULT_VARIABLE _result
         )
         if(NOT _result EQUAL 0)
@@ -1028,7 +1463,7 @@ jobs:
     - name: Build
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         execute_process_x(
@@ -1050,7 +1485,7 @@ jobs:
     - name: Run tests
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         execute_process_x(
@@ -1070,7 +1505,7 @@ jobs:
     - name: Status Check
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         execute_process_x(
@@ -1098,7 +1533,7 @@ jobs:
     - name: Test installation
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         execute_process_x(
@@ -1116,7 +1551,7 @@ jobs:
       if: matrix.config.test_external_bindings
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         ### FIXME Can we avoid this duplication?
@@ -1158,6 +1593,12 @@ jobs:
                                        -D CMAKE_CXX_COMPILER_LAUNCHER=${_ccache_cmd})
         endif()
 
+        #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+        set(_swig_extra_options)
+        if(NOT "${{ matrix.config.swig_extra_options }}" STREQUAL "")
+          set(_swig_extra_options ${{ matrix.config.swig_extra_options }})
+        endif()
+
         execute_process_x(
           COMMAND ${CMAKE_COMMAND}
             -S bindings
@@ -1171,6 +1612,7 @@ jobs:
             ${_install_prefix}
             ${_cmake_compiler_lauchers}
             ${_cmake_extra_options}
+            ${_swig_extra_options}
             -DYARP_DIR=$ENV{GITHUB_WORKSPACE}/build
           RESULT_VARIABLE _result
         )
@@ -1192,7 +1634,7 @@ jobs:
       if: matrix.config.test_external_bindings
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         ### FIXME Can we avoid this duplication?
@@ -1234,6 +1676,12 @@ jobs:
                                        -D CMAKE_CXX_COMPILER_LAUNCHER=${_ccache_cmd})
         endif()
 
+        #SWIGFIX temporary fix for swig 4.3.0. The following lines should be removed.
+        set(_swig_extra_options)
+        if(NOT "${{ matrix.config.swig_extra_options }}" STREQUAL "")
+          set(_swig_extra_options ${{ matrix.config.swig_extra_options }})
+        endif()
+
         execute_process_x(
           COMMAND ${CMAKE_COMMAND}
             -S bindings
@@ -1247,6 +1695,7 @@ jobs:
             ${_install_prefix}
             ${_cmake_compiler_lauchers}
             ${_cmake_extra_options}
+            ${_swig_extra_options}
             -DYARP_DIR=$ENV{GITHUB_WORKSPACE}/install/lib/cmake/YARP
           RESULT_VARIABLE _result
         )
@@ -1267,7 +1716,7 @@ jobs:
     - name: Compress installation files
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         execute_process_x(
@@ -1276,7 +1725,7 @@ jobs:
         )
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       with:
         name: installation-${{ matrix.config.id }}
         path: install.tar
@@ -1285,7 +1734,7 @@ jobs:
     - name: Cleanup
       shell: cmake -P {0}
       run: |
-        cmake_minimum_required(VERSION 3.17)
+        cmake_minimum_required(VERSION 3.19)
         include(${{ steps.prepare_environment_script.outputs.environment_script }})
 
         # Reset ccache stats before uploading
@@ -1296,10 +1745,10 @@ jobs:
     environment: code-analysis
     name: 'Codacy - clang-tidy'
     needs: [select_environment, run-cmake]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
@@ -1308,22 +1757,32 @@ jobs:
     # find a better way to do it automatically
     - name: Dependencies [Linux]
       if: runner.os == 'Linux'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
+      shell: bash
+      run: |
+          # Install dep for gstreamer. It must be the first one.
+          sudo apt-get update
+          sudo apt-get install -y      libunwind-dev
+
           # Install Robotology dependencies from robotology ppa
           sudo apt-add-repository -y ppa:robotology/ppa
-          sudo apt-get install -qq -y ycm-cmake-modules \
-                                      librobottestingframework-dev
+          sudo apt-get install -qq -y librobottestingframework-dev
+
+          # Install cmake
+          sudo apt-get install -qq -y cmake
+          which cmake
+          cmake --version
+          /usr/bin/cmake --version
+
+          # Install ycm
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.deb
+          sudo dpkg -i ycm-cmake-modules-0.15.3-all.deb
 
           # Install build tools
-          sudo apt-get install -qq -y cmake \
-                                      ccache \
+          sudo apt-get install -qq -y ccache \
                                       ninja-build \
-                                      valgrind
+                                      valgrind \
+                                      openjdk-17-jdk \
+                                      openjdk-17-jre
 
           sudo apt-get install -qq -y libace-dev \
                                       libsqlite3-dev \
@@ -1337,8 +1796,6 @@ jobs:
                                       libopencv-dev \
                                       libeigen3-dev \
                                       libgraphviz-dev \
-                                      libgstreamer1.0-dev \
-                                      libgstreamer-plugins-base1.0-dev \
                                       libpng-dev \
                                       libv4l-dev \
                                       libavcodec-dev \
@@ -1350,23 +1807,34 @@ jobs:
                                       libopenni2-dev \
                                       libftdi-dev \
                                       libi2c-dev \
-                                      libfuse-dev \
                                       libjpeg-dev \
                                       libpcl-dev
 
-          # Install SWIG and bindings dependencies
-          sudo apt-get install -qq -y swig \
-                                      mono-mcs \
+          sudo apt-get install -y     libgstreamer1.0-dev \
+                                      libgstreamer-plugins-base1.0-dev
+
+          # Install bindings dependencies
+          sudo apt-get install -qq -y mono-mcs \
                                       liblua5.3-dev \
                                       lua5.3 \
                                       tcl-dev \
                                       tk-dev \
                                       python3-dev \
                                       liboctave-dev \
-                                      default-jdk \
                                       ruby-dev \
                                       ruby \
                                       perl
+
+          # Install SWIG
+          # On Ubuntu 24.04 this corresponds to swig 4.2.0 which is affected by a bug: https://github.com/robotology/yarp/issues/3083
+          # sudo apt-get install -qq -y swig 
+          #
+          # we thus install manually swig 4.3.0
+          sudo apt-get purge -y swig
+          wget -nv https://github.com/robotology/robotology-vcpkg-ports/releases/download/storage/swig_4_3_0_ubuntu_24_04.zip
+          unzip -q swig_4_3_0_ubuntu_24_04.zip
+          sudo mv swig_4_3_0_ubuntu_24_04_install/bin/* /usr/bin
+          sudo mv swig_4_3_0_ubuntu_24_04_install/share/swig /usr/share
 
           # Other tools useful in github actions
           sudo apt-get install -qq -y jq \
@@ -1376,8 +1844,6 @@ jobs:
                                       gcovr \
                                       wget \
                                       curl \
-                                      clang-11 \
-                                      clang-tidy-11 \
                                       xsltproc \
                                       libxml2-utils \
                                       source-highlight
@@ -1388,8 +1854,8 @@ jobs:
     - name: Prepare environment
       env:
         CODACY_TOKEN: ${{ secrets.CODACY_TOKEN }}
-        CLANG_VERSION: 10
-        CODACY_CLANG_TIDY_VERSION: 1.2.1
+        CLANG_VERSION: 17
+        CODACY_CLANG_TIDY_VERSION: 1.3.8
       run: |
         echo "CLANG_VERSION=${CLANG_VERSION}" >> $GITHUB_ENV
         echo "CC=/usr/bin/clang-${CLANG_VERSION}" >> $GITHUB_ENV
@@ -1409,18 +1875,16 @@ jobs:
 
     - name: Download codacy-clang-tidy
       if: runner.os == 'Linux'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
-          # Download extra packages required
-          sudo apt-get install -qq -y clang-${CLANG_VERSION} \
-                                      clang-tidy-${CLANG_VERSION}
+      shell: bash
+      run: |
+          #Install clang 17. `all` option is required for clang-tidy
+          sudo apt-get purge -y llvm* clang*
+          wget -nv https://apt.llvm.org/llvm.sh
+          sudo chmod +x llvm.sh
+          sudo ./llvm.sh 17 all
 
           # Download codacy-clang-tidy
-          sudo wget https://github.com/codacy/codacy-clang-tidy/releases/download/${CODACY_CLANG_TIDY_VERSION}/codacy-clang-tidy-${CODACY_CLANG_TIDY_VERSION} -O /usr/local/bin/codacy-clang-tidy-${CODACY_CLANG_TIDY_VERSION}
+          sudo wget https://github.com/codacy/codacy-clang-tidy/releases/download/${CODACY_CLANG_TIDY_VERSION}/codacy-clang-tidy-linux-${CODACY_CLANG_TIDY_VERSION} -O /usr/local/bin/codacy-clang-tidy-${CODACY_CLANG_TIDY_VERSION}
           sudo chmod -v +x /usr/local/bin/codacy-clang-tidy-${CODACY_CLANG_TIDY_VERSION}
 
     - name: Run CMake
@@ -1484,10 +1948,10 @@ jobs:
     environment: code-analysis
     name: 'Codacy - coverage'
     needs: [select_environment, run-cmake]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
@@ -1496,22 +1960,32 @@ jobs:
     # find a better way to do it automatically
     - name: Dependencies [Linux]
       if: runner.os == 'Linux'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
+      shell: bash
+      run: |
+          # Install dep for gstreamer. It must be the first one.
+          sudo apt-get update
+          sudo apt-get install -y      libunwind-dev
+
           # Install Robotology dependencies from robotology ppa
           sudo apt-add-repository -y ppa:robotology/ppa
-          sudo apt-get install -qq -y ycm-cmake-modules \
-                                      librobottestingframework-dev
+          sudo apt-get install -qq -y librobottestingframework-dev
+
+          # Install cmake
+          sudo apt-get install -qq -y cmake
+          which cmake
+          cmake --version
+          /usr/bin/cmake --version
+
+          # Install ycm
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.deb
+          sudo dpkg -i ycm-cmake-modules-0.15.3-all.deb
 
           # Install build tools
-          sudo apt-get install -qq -y cmake \
-                                      ccache \
+          sudo apt-get install -qq -y ccache \
                                       ninja-build \
-                                      valgrind
+                                      valgrind \
+                                      openjdk-17-jdk \
+                                      openjdk-17-jre
 
           sudo apt-get install -qq -y libace-dev \
                                       libsqlite3-dev \
@@ -1538,23 +2012,31 @@ jobs:
                                       libopenni2-dev \
                                       libftdi-dev \
                                       libi2c-dev \
-                                      libfuse-dev \
                                       libjpeg-dev \
                                       libpcl-dev
 
-          # Install SWIG and bindings dependencies
-          sudo apt-get install -qq -y swig \
-                                      mono-mcs \
+          # Install bindings dependencies
+          sudo apt-get install -qq -y mono-mcs \
                                       liblua5.3-dev \
                                       lua5.3 \
                                       tcl-dev \
                                       tk-dev \
                                       python3-dev \
                                       liboctave-dev \
-                                      default-jdk \
                                       ruby-dev \
                                       ruby \
                                       perl
+
+          # Install SWIG
+          # On Ubuntu 24.04 this corresponds to swig 4.2.0 which is affected by a bug: https://github.com/robotology/yarp/issues/3083
+          # sudo apt-get install -qq -y swig 
+          #
+          # we thus install manually swig 4.3.0
+          sudo apt-get purge -y swig
+          wget -nv https://github.com/robotology/robotology-vcpkg-ports/releases/download/storage/swig_4_3_0_ubuntu_24_04.zip
+          unzip -q swig_4_3_0_ubuntu_24_04.zip
+          sudo mv swig_4_3_0_ubuntu_24_04_install/bin/* /usr/bin
+          sudo mv swig_4_3_0_ubuntu_24_04_install/share/swig /usr/share
 
           # Other tools useful in github actions
           sudo apt-get install -qq -y jq \
@@ -1562,10 +2044,6 @@ jobs:
                                       curl \
                                       lcov \
                                       gcovr \
-                                      wget \
-                                      curl \
-                                      clang-11 \
-                                      clang-tidy-11 \
                                       xsltproc \
                                       libxml2-utils \
                                       source-highlight
@@ -1590,7 +2068,7 @@ jobs:
 
         (cd build && lcov --directory . --zerocounters)
 
-        (cd build && make && make test)
+        (cd build && make && make CTEST_OUTPUT_ON_FAILURE=1 test)
 
         # Capture coverage info for Profile builds
         (cd build; lcov --directory . --capture --rc lcov_branch_coverage=1 --output-file coverage.info)
@@ -1612,10 +2090,10 @@ jobs:
     environment: code-analysis
     name: 'SonarCloud'
     needs: [select_environment, run-cmake]
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
     - name: Clone repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
       with:
         repository: ${{ needs.select_environment.outputs.repository }}
         ref: ${{ needs.select_environment.outputs.ref }}
@@ -1634,7 +2112,7 @@ jobs:
         SONAR_TESTS: 'tests'
         SONAR_CFAMILY_GCOV_REPORTSPATH: 'build/coverage.info'
         SONAR_CFAMILY_CACHE_ENABLED: true
-        SONAR_SCANNER_VERSION: '4.6.0.2311'
+        SONAR_SCANNER_VERSION: '5.0.1.3006'
         SONAR_THREADS: 2
       run: |
         # Internal variables
@@ -1693,29 +2171,39 @@ jobs:
         curl -sSLo ${SONAR_HOME}/build-wrapper-linux-x86.zip https://sonarcloud.io/static/cpp/build-wrapper-linux-x86.zip
         unzip -o ${SONAR_HOME}/build-wrapper-linux-x86.zip -d ${SONAR_HOME}/
 
-        echo "::set-output name=sonar_path::${SONAR_HOME_PATH}"
-        echo "::set-output name=sonar_cache_path::${SONAR_CACHE_PATH}"
+        echo "sonar_path=${SONAR_HOME_PATH}" >> $GITHUB_OUTPUT
+        echo "sonar_cache_path=${SONAR_CACHE_PATH}" >> $GITHUB_OUTPUT
 
     # This step is copied from the build step, please keep them in sync until we
     # find a better way to do it automatically
     - name: Dependencies [Linux]
       if: runner.os == 'Linux'
-      uses: nick-invision/retry@v2.2.0
-      with:
-        timeout_minutes: 20
-        retry_wait_seconds: 300
-        max_attempts: 3
-        command: |
+      shell: bash
+      run: |
+          # Install dep for gstreamer. It must be the first one.
+          sudo apt-get update
+          sudo apt-get install -y      libunwind-dev
+
           # Install Robotology dependencies from robotology ppa
           sudo apt-add-repository -y ppa:robotology/ppa
-          sudo apt-get install -qq -y ycm-cmake-modules \
-                                      librobottestingframework-dev
+          sudo apt-get install -qq -y librobottestingframework-dev
+
+          # Install cmake
+          sudo apt-get install -qq -y cmake
+          which cmake
+          cmake --version
+          /usr/bin/cmake --version
+
+          # Install ycm
+          wget -nv https://github.com/robotology/ycm/releases/download/v0.15.3/ycm-cmake-modules-0.15.3-all.deb
+          sudo dpkg -i ycm-cmake-modules-0.15.3-all.deb
 
           # Install build tools
-          sudo apt-get install -qq -y cmake \
-                                      ccache \
+          sudo apt-get install -qq -y ccache \
                                       ninja-build \
-                                      valgrind
+                                      valgrind \
+                                      openjdk-17-jdk \
+                                      openjdk-17-jre
 
           sudo apt-get install -qq -y libace-dev \
                                       libsqlite3-dev \
@@ -1742,23 +2230,31 @@ jobs:
                                       libopenni2-dev \
                                       libftdi-dev \
                                       libi2c-dev \
-                                      libfuse-dev \
                                       libjpeg-dev \
                                       libpcl-dev
 
-          # Install SWIG and bindings dependencies
-          sudo apt-get install -qq -y swig \
-                                      mono-mcs \
+          # Install bindings dependencies
+          sudo apt-get install -qq -y mono-mcs \
                                       liblua5.3-dev \
                                       lua5.3 \
                                       tcl-dev \
                                       tk-dev \
                                       python3-dev \
                                       liboctave-dev \
-                                      default-jdk \
                                       ruby-dev \
                                       ruby \
                                       perl
+
+          # Install SWIG
+          # On Ubuntu 24.04 this corresponds to swig 4.2.0 which is affected by a bug: https://github.com/robotology/yarp/issues/3083
+          # sudo apt-get install -qq -y swig 
+          #
+          # we thus install manually swig 4.3.0
+          sudo apt-get purge -y swig
+          wget -nv https://github.com/robotology/robotology-vcpkg-ports/releases/download/storage/swig_4_3_0_ubuntu_24_04.zip
+          unzip -q swig_4_3_0_ubuntu_24_04.zip
+          sudo mv swig_4_3_0_ubuntu_24_04_install/bin/* /usr/bin
+          sudo mv swig_4_3_0_ubuntu_24_04_install/share/swig /usr/share
 
           # Other tools useful in github actions
           sudo apt-get install -qq -y jq \
@@ -1768,8 +2264,6 @@ jobs:
                                       gcovr \
                                       wget \
                                       curl \
-                                      clang-11 \
-                                      clang-tidy-11 \
                                       xsltproc \
                                       libxml2-utils \
                                       source-highlight
@@ -1794,7 +2288,7 @@ jobs:
 
         cat $GITHUB_ENV
 
-        echo "::set-output name=ccache_path::${CCACHE_HOME_PATH}"
+        echo "ccache_path=${CCACHE_HOME_PATH}" >> $GITHUB_OUTPUT
 
     - name: Print info and reset stats before build
       run: |
@@ -1803,6 +2297,7 @@ jobs:
         which ccache
         ccache --version
         ccache -p
+
 
         ls -la --color=always /usr/lib/ccache
 
@@ -1813,7 +2308,7 @@ jobs:
         gcovr --version
 
     - name: Handle cache
-      uses: actions/cache@v2
+      uses: actions/cache@v3
       with:
         path: |
           ${{ steps.init_ccache.outputs.ccache_path }}
@@ -1856,7 +2351,7 @@ jobs:
         wget https://raw.githubusercontent.com/zanata/zanata-tests/master/scripts/CTest2JUnit.xsl -O CTest2JUnit.xsl
 
         # -T Test produces the xml output with the results
-        (cd build && ctest -T test)
+        (cd build && ctest -T test --rerun-failed --output-on-failure --verbose)
         xsltproc CTest2JUnit.xsl build/Testing/$(head -n 1 < build/Testing/TAG)/Test.xml > build/JUnitTestResults.xml
 
     - name: Print tests results file
@@ -1872,7 +2367,8 @@ jobs:
 
     - name: Capture coverage info
       run: |
-        (cd build && gcovr --sonarqube --branches --output coverage.xml --root .. .)
+        (cd build && \
+        gcovr --exclude="../extern/*" --sonarqube --branches --output coverage.xml --root .. .)
 
     - name: Print coverage info file
       run: |
@@ -1924,8 +2420,17 @@ jobs:
             -Dsonar.cfamily.cache.enabled=${SONAR_CFAMILY_CACHE_ENABLED} \
             -Dsonar.coverageReportPaths=build/coverage.xml \
             -Dsonar.junit.reportPaths=build/JUnitTestResults.xml \
-            -Dsonar.exclusions="src/yarp*/**/* src/carriers/**/* src/devices/**/* src/idls/**/* src/libyarp*/**/* src/robottestingframework-plugins/**/* tests/**/*" \
-            -Dsonar.coverage.exclusions="src/yarp*/**/* src/carriers/**/* src/devices/**/* src/idls/**/* src/libyarp*/**/* src/robottestingframework-plugins/**/*" \
+            -Dsonar.exclusions="src/yarp*/**/* src/guis/* src/carriers/**/* src/devices/**/* src/idls/**/* src/libyarp*/**/* src/robottestingframework-plugins/**/* tests/**/*" \
+            -Dsonar.coverage.exclusions="\
+                 src/libYARP_dev/src/yarp/dev/tests/*,\
+                 src/devices/*/tests/*,\
+                 src/carriers/*/tests/*,\
+                 src/portmonitors/*/tests/*,\
+                 tests/**/*,\
+                 src/yarp*/**/*,\
+                 src/guis/*,\
+                 robottestingframework-plugins/**/*\
+                 " \
             -Dsonar.branch.longLivedBranches.regex="^(master|yarp-.+)$" \
             ${SONAR_TESTS_CMD_ARG} \
             ${SONAR_PROJECT_NAME_CMD_ARG} \

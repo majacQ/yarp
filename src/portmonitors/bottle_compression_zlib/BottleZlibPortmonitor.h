@@ -12,10 +12,12 @@
 #include <yarp/os/MonitorObject.h>
 
  /**
+  * @ingroup portmonitors_lists
   * \brief `bottle_compression_zlib_portmonitor`: Portmonitor plugin for compression and decompression of bottles (or yarp data types castable to bottle) using zlib library.
   *
   * Example usage:
   * yarp connect /src /dest tcp+send.portmonitor+file.bottle_compression_zlib+recv.portmonitor+file.bottle_compression_zlib+type.dll
+  * yarp connect /src /dest tcp+send.portmonitor+file.bottle_compression_zlib+recv.portmonitor+file.bottle_compression_zlib+type.dll+debug_compression_info
   */
 class BottleZlibMonitorObject : public yarp::os::MonitorObject
 {
@@ -37,6 +39,7 @@ private:
     yarp::os::Things m_th;
     yarp::os::Bottle m_data;
     bool             m_shouldCompress;
+    bool             m_debug_compression_size = false;
 };
 
 #endif

@@ -22,7 +22,12 @@ class YARP_dev_API yarp::dev::MotorTorqueParameters
     double bemf_scale;
     double ktau;
     double ktau_scale;
-    MotorTorqueParameters() : bemf(0), bemf_scale(0), ktau(0), ktau_scale(0) {};
+    double viscousPos;
+    double viscousNeg;
+    double coulombPos;
+    double coulombNeg;
+    double velocityThres;
+    MotorTorqueParameters() : bemf(0), bemf_scale(0), ktau(0), ktau_scale(0), viscousPos(0), viscousNeg(0), coulombPos(0), coulombNeg(0), velocityThres(0){};
 };
 
 /**
@@ -126,7 +131,7 @@ public:
 };
 
 /**
- * @ingroup dev_iface_motor
+ * @ingroup dev_iface_motor_raw
  *
  * Interface for control boards implementing torque control.
  */

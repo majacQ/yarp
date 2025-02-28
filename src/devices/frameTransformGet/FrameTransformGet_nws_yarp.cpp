@@ -7,7 +7,9 @@
 
 #include <yarp/os/LogComponent.h>
 #include <yarp/os/LogStream.h>
+#include <yarp/dev/ReturnValue.h>
 
+using namespace yarp::dev;
 
 YARP_LOG_COMPONENT(FRAMETRANSFORMGETNWSYARP, "yarp.devices.FrameTransformGet_nws_yarp")
 
@@ -78,6 +80,12 @@ bool FrameTransformGet_nws_yarp::open(yarp::os::Searchable &config)
             yCWarning(FRAMETRANSFORMGETNWSYARP) << "no output_streaming_port_prefix param found. The resulting port name will be: " << m_streaming_port_name;
         }
         yCInfo(FRAMETRANSFORMGETNWSYARP) << "Streaming transforms on Yarp port enabled";
+        if (!m_streaming_port.open(m_streaming_port_name))
+        {
+            yCError(FRAMETRANSFORMGETNWSYARP, "Could not open \"%s\" port", m_streaming_port_name.c_str());
+            return false;
+        }
+
         this->start();
     }
     else
@@ -88,25 +96,34 @@ bool FrameTransformGet_nws_yarp::open(yarp::os::Searchable &config)
     return true;
 }
 
+FrameTransformGet_nws_yarp::~FrameTransformGet_nws_yarp()
+{
+    close();
+}
 
 bool FrameTransformGet_nws_yarp::close()
 {
-    if (m_streaming_port_enabled)
+    // Stop the thread
+    if (this->isRunning())
     {
         this->stop();
     }
 
-    yCTrace(FRAMETRANSFORMGETNWSYARP, "Close");
+    // Detaching
     detach();
+
     // Closing port
     m_thrift_rpcPort.interrupt();
     m_thrift_rpcPort.close();
+    m_streaming_port.interrupt();
+    m_streaming_port.close();
     return true;
 }
 
 
 bool FrameTransformGet_nws_yarp::detach()
 {
+    std::lock_guard<std::mutex> m_lock(m_mutex);
     m_iFrameTransformStorageGet = nullptr;
     return true;
 }
@@ -114,6 +131,7 @@ bool FrameTransformGet_nws_yarp::detach()
 
 bool FrameTransformGet_nws_yarp::attach( yarp::dev::PolyDriver* deviceToAttach)
 {
+    std::lock_guard<std::mutex> m_lock(m_mutex);
     deviceToAttach->view(m_iFrameTransformStorageGet);
 
     if ( m_iFrameTransformStorageGet==nullptr){
@@ -126,41 +144,38 @@ bool FrameTransformGet_nws_yarp::attach( yarp::dev::PolyDriver* deviceToAttach)
 
 return_getAllTransforms FrameTransformGet_nws_yarp::getTransformsRPC()
 {
-    if (m_iFrameTransformStorageGet != nullptr) {
-        std::vector<yarp::math::FrameTransform> localTransform;
-        if (m_iFrameTransformStorageGet->getTransforms(localTransform)) {
-            return return_getAllTransforms(true, localTransform);
-        }
-    }
-    yCError(FRAMETRANSFORMGETNWSYARP) << "error getting transform from interface";
-    return return_getAllTransforms(false, std::vector<yarp::math::FrameTransform>());;
+    std::lock_guard<std::mutex> m_lock(m_mutex);
 
-}
-
-bool FrameTransformGet_nws_yarp::threadInit()
-{
-    if (!m_streaming_port.open(m_streaming_port_name))
-    {
-        yCError(FRAMETRANSFORMGETNWSYARP, "Could not open \"%s\" port", m_streaming_port_name.c_str());
-        return false;
-    }
-    return true;
-}
-
-void FrameTransformGet_nws_yarp::threadRelease()
-{
-    m_streaming_port.interrupt();
-    m_streaming_port.close();
-}
-
-void FrameTransformGet_nws_yarp::run()
-{
+    return_getAllTransforms ret;
     if (m_iFrameTransformStorageGet != nullptr)
     {
         std::vector<yarp::math::FrameTransform> localTransform;
         if (m_iFrameTransformStorageGet->getTransforms(localTransform))
         {
-            return_getAllTransforms rgt(true, localTransform);
+            ret.transforms_list = localTransform;
+            ret.retvalue = ReturnValue_ok;
+            return ret;
+        }
+    }
+    yCError(FRAMETRANSFORMGETNWSYARP) << "error getting transform from interface";
+    ret.transforms_list = std::vector<yarp::math::FrameTransform>();
+    ret.retvalue = ReturnValue::return_code::return_value_error_method_failed;
+    return ret;
+
+}
+
+void FrameTransformGet_nws_yarp::run()
+{
+    std::lock_guard<std::mutex> m_lock(m_mutex);
+
+    if (m_iFrameTransformStorageGet != nullptr)
+    {
+        std::vector<yarp::math::FrameTransform> localTransform;
+        if (m_iFrameTransformStorageGet->getTransforms(localTransform))
+        {
+            return_getAllTransforms rgt;
+            rgt.retvalue = ReturnValue_ok;
+            rgt.transforms_list = localTransform;
             m_streaming_port.write(rgt);
         }
     }

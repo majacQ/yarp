@@ -13,6 +13,7 @@
 
 using namespace yarp::os;
 using namespace yarp::dev;
+using namespace yarp::sig;
 
 #ifndef DEG2RAD
 #define DEG2RAD M_PI/180.0
@@ -20,58 +21,62 @@ using namespace yarp::dev;
 
 YARP_LOG_COMPONENT(LASER_BASE, "yarp.devices.Lidar2DDeviceBase")
 
-bool Lidar2DDeviceBase::getScanLimits(double& min, double& max)
+ReturnValue Lidar2DDeviceBase::getScanLimits(double& min, double& max)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     min = m_min_angle;
     max = m_max_angle;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getDistanceRange(double& min, double& max)
+ReturnValue Lidar2DDeviceBase::getDistanceRange(double& min, double& max)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     min = m_min_distance;
     max = m_max_distance;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getHorizontalResolution(double& step)
+ReturnValue Lidar2DDeviceBase::getHorizontalResolution(double& step)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     step = m_resolution;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getDeviceStatus(Device_status& status)
+ReturnValue Lidar2DDeviceBase::getDeviceStatus(Device_status& status)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     status = m_device_status;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getRawData(yarp::sig::Vector& out)
+ReturnValue Lidar2DDeviceBase::getRawData(yarp::sig::Vector& out, double* timestamp)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     out = m_laser_data;
-    return true;
+    if (timestamp != nullptr)
+    {
+        *timestamp = m_timestamp.getTime();
+    }
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getScanRate(double& rate)
+ReturnValue Lidar2DDeviceBase::getScanRate(double& rate)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     rate = m_scan_rate;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getDeviceInfo(std::string& device_info)
+ReturnValue Lidar2DDeviceBase::getDeviceInfo(std::string& device_info)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     device_info = m_info;
-    return true;
+    return ReturnValue_ok;
 }
 
-bool Lidar2DDeviceBase::getLaserMeasurement(std::vector<LaserMeasurementData>& data)
+ReturnValue Lidar2DDeviceBase::getLaserMeasurement(std::vector<LaserMeasurementData>& data, double* timestamp)
 {
     std::lock_guard<std::mutex> guard(m_mutex);
 #ifdef LASER_DEBUG
@@ -79,14 +84,22 @@ bool Lidar2DDeviceBase::getLaserMeasurement(std::vector<LaserMeasurementData>& d
 #endif
     size_t size = m_laser_data.size();
     data.resize(size);
-    if (m_max_angle < m_min_angle) { yCError(LASER_BASE) << "getLaserMeasurement failed"; return false; }
+    if (m_max_angle < m_min_angle)
+    {
+        yCError(LASER_BASE) << "getLaserMeasurement failed";
+        return ReturnValue::return_code::return_value_error_method_failed;
+    }
     double laser_angle_of_view = m_max_angle - m_min_angle;
     for (size_t i = 0; i < size; i++)
     {
         double angle = (i / double(size) * laser_angle_of_view + m_min_angle) * DEG2RAD;
         data[i].set_polar(m_laser_data[i], angle);
     }
-    return true;
+    if (timestamp!=nullptr)
+    {
+        *timestamp = m_timestamp.getTime();
+    }
+    return ReturnValue_ok;
 }
 
 Lidar2DDeviceBase::Lidar2DDeviceBase() :
@@ -105,6 +118,8 @@ Lidar2DDeviceBase::Lidar2DDeviceBase() :
 
 bool Lidar2DDeviceBase::parseConfiguration(yarp::os::Searchable& config)
 {
+    std::string config_str = config.toString();
+
     //sensor options (should be mandatory? TBD)
     {
         bool br = config.check("SENSOR");
@@ -261,13 +276,6 @@ bool Lidar2DDeviceBase::applyLimitsOnLaserData()
     }
     return true;
 }
-
-yarp::os::Stamp Lidar2DDeviceBase::getLastInputStamp()
-{
-    std::lock_guard<std::mutex> guard(m_mutex);
-    return m_timestamp;
-}
-
 
 bool Lidar2DDeviceBase::updateLidarData()
 {

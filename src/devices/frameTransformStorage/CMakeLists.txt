@@ -6,6 +6,7 @@ yarp_prepare_plugin(frameTransformStorage
   TYPE FrameTransformStorage
   INCLUDE FrameTransformStorage.h
   DEPENDS "TARGET YARP::YARP_math"
+  GENERATE_PARSER
   DEFAULT ON
 )
 
@@ -16,10 +17,9 @@ if(NOT SKIP_frameTransformStorage)
     PRIVATE
       FrameTransformStorage.cpp
       FrameTransformStorage.h
+      FrameTransformStorage_ParamsParser.cpp
+      FrameTransformStorage_ParamsParser.h
   )
-
-  target_sources(yarp_frameTransformStorage PRIVATE $<TARGET_OBJECTS:FrameTransformUtils>)
-  target_include_directories(yarp_frameTransformStorage PRIVATE $<TARGET_PROPERTY:FrameTransformUtils,INTERFACE_INCLUDE_DIRECTORIES>)
 
   target_link_libraries(yarp_frameTransformStorage
     PRIVATE
@@ -47,4 +47,9 @@ if(NOT SKIP_frameTransformStorage)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_frameTransformStorage PROPERTY FOLDER "Plugins/Device")
+
+  if(YARP_COMPILE_TESTS)
+    add_subdirectory(tests)
+  endif()
+
 endif()

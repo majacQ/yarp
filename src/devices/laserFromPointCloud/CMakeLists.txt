@@ -19,13 +19,11 @@ if(NOT SKIP_laserFromPointCloud)
       YARP::YARP_sig
       YARP::YARP_dev
       YARP::YARP_math
-      YARP::YARP_rosmsg
   )
   list(APPEND YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS YARP_os
     YARP_sig
     YARP_dev
     YARP_math
-    YARP_rosmsg
   )
 
   yarp_install(
@@ -40,4 +38,9 @@ if(NOT SKIP_laserFromPointCloud)
   set(YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS ${YARP_${YARP_PLUGIN_MASTER}_PRIVATE_DEPS} PARENT_SCOPE)
 
   set_property(TARGET yarp_laserFromPointCloud PROPERTY FOLDER "Plugins/Device")
+
+#  if(YARP_COMPILE_TESTS)
+#    add_subdirectory(tests)
+#  endif()
+
 endif()

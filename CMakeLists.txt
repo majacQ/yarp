@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2006-2010 RobotCub Consortium
 # SPDX-License-Identifier: BSD-3-Clause
 
-cmake_minimum_required(VERSION 3.16)
+cmake_minimum_required(VERSION 3.19)
 
 # UseSWIG generates now standard target names.
 if(${CMAKE_VERSION} VERSION_GREATER_EQUAL 3.13)
@@ -17,7 +17,7 @@ endif()
 # Main project
 project(
   YARP
-  VERSION 3.5.0
+  VERSION 3.11.100
   LANGUAGES C CXX
 )
 set(PROJECT_DESCRIPTION "YARP: A thin middleware for humanoid robots and more")
@@ -29,7 +29,7 @@ list(APPEND CMAKE_MODULE_PATH ${YARP_MODULE_DIR})
 
 # Find YCM
 # This is required here, because YarpVersion uses GitInfo from YCM
-set(YCM_REQUIRED_VERSION 0.13.0) # Used also by YarpFindDependencies
+set(YCM_REQUIRED_VERSION 0.15.1) # Used also by YarpFindDependencies
 find_package(YCM ${YCM_REQUIRED_VERSION} REQUIRED)
 
 # Get the current YARP version.
